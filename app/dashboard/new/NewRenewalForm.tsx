@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatAmount, CURRENCY_OPTIONS } from '@/lib/format'
-import type { Profile, LineItem } from '@/lib/types'
+import type { Profile, Invoice, LineItem } from '@/lib/types'
 
 // ─── Icon sub-components ────────────────────────────────────────────────────
 
@@ -67,6 +67,15 @@ function RefreshIcon() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="1 4 1 10 7 10"/>
       <path d="M3.51 15a9 9 0 1 0 .49-3.33"/>
+    </svg>
+  )
+}
+
+function EmailIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="4" width="20" height="16" rx="2"/>
+      <polyline points="2,4 12,13 22,4"/>
     </svg>
   )
 }
@@ -397,32 +406,35 @@ function generatePdfHtml(
 
 interface Props {
   profile: Profile | null
+  invoice?: Invoice | null
 }
 
-export default function NewRenewalForm({ profile }: Props) {
+export default function NewRenewalForm({ profile, invoice }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(null)
-  const [invNumber] = useState(() => `INV-${Date.now().toString().slice(-6)}`)
+  const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(invoice?.id ?? null)
+  const [invNumber] = useState(() => invoice?.inv_number ?? `INV-${Date.now().toString().slice(-6)}`)
 
   const [form, setForm] = useState<FormData>({
-    clientName: '',
-    contactName: '',
-    clientEmail: '',
-    clientPhone: '',
-    serviceName: '',
-    servicePlan: '',
-    renewalDate: '',
+    clientName: invoice?.client_name ?? '',
+    contactName: invoice?.contact_name ?? '',
+    clientEmail: invoice?.client_email ?? '',
+    clientPhone: invoice?.client_phone ?? '',
+    serviceName: invoice?.service_name ?? '',
+    servicePlan: invoice?.service_plan ?? '',
+    renewalDate: invoice?.renewal_date ?? '',
     reminderDays: 7,
-    clientNotes: '',
+    clientNotes: invoice?.notes ?? '',
     bizName: profile?.business_name ?? '',
     bizEmail: profile?.business_email ?? '',
-    currency: profile?.currency ?? 'NGN',
-    taxRate: profile?.tax_rate ?? 7.5,
+    currency: invoice?.currency ?? profile?.currency ?? 'NGN',
+    taxRate: invoice?.tax_rate ?? profile?.tax_rate ?? 7.5,
   })
 
-  const [items, setItems] = useState<LineItem[]>([])
+  const [items, setItems] = useState<LineItem[]>(
+    Array.isArray(invoice?.line_items) ? invoice.line_items : []
+  )
 
   function setField<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -481,21 +493,22 @@ export default function NewRenewalForm({ profile }: Props) {
         tax_amount: taxAmount,
         total: grand,
         currency: form.currency,
-        status: 'pending' as const,
         notes: form.clientNotes || null,
         updated_at: new Date().toISOString(),
       }
 
       if (savedInvoiceId) {
+        // UPDATE — status is managed separately via the invoice list dropdown
         const { error } = await supabase
           .from('invoices')
           .update(payload)
           .eq('id', savedInvoiceId)
         if (error) { setSaveError(error.message); return }
       } else {
+        // INSERT — always starts as pending
         const { data, error } = await supabase
           .from('invoices')
-          .insert(payload)
+          .insert({ ...payload, status: 'pending' as const })
           .select('id')
           .single()
         if (error) { setSaveError(error.message); return }
@@ -592,6 +605,42 @@ export default function NewRenewalForm({ profile }: Props) {
 
     const base = phone ? `https://wa.me/${phone}` : 'https://wa.me/'
     return `${base}?text=${encodeURIComponent(msg)}`
+  }
+
+  function buildEmailLink(): string {
+    const to = form.clientEmail || ''
+    const subject = encodeURIComponent(
+      `Invoice from ${form.bizName || 'us'} — ${invNumber}`
+    )
+    const dueFmt = form.renewalDate
+      ? new Date(form.renewalDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+      : ''
+    const svc = form.serviceName || 'Service'
+    const plan = form.servicePlan ? ` (${form.servicePlan})` : ''
+    const body = encodeURIComponent(
+      [
+        `Hello ${form.clientName || 'there'},`,
+        ``,
+        `Please find your invoice details below.`,
+        ``,
+        `Invoice:    ${invNumber}`,
+        `Service:    ${svc}${plan}`,
+        dueFmt ? `Due date:   ${dueFmt}` : '',
+        `Total:      ${formatAmount(grand, form.currency)}`,
+        ``,
+        form.clientNotes || '',
+        form.clientNotes ? `` : '',
+        `Please reach out if you have any questions.`,
+        ``,
+        `— ${form.bizName || 'us'}`,
+        form.bizEmail ? form.bizEmail : '',
+      ]
+        .filter((l) => l !== undefined)
+        .join('\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    )
+    return `mailto:${to}?subject=${subject}&body=${body}`
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -972,9 +1021,18 @@ export default function NewRenewalForm({ profile }: Props) {
                   Send invoice via WhatsApp
                 </button>
               </a>
+              <a
+                href={buildEmailLink()}
+                className={form.clientEmail ? '' : 'pointer-events-none opacity-50'}
+              >
+                <button className="flex items-center justify-center gap-2 w-full px-4 py-3.5 bg-white border border-black/[0.12] text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                  <EmailIcon />
+                  {form.clientEmail ? 'Send invoice via email' : 'Send invoice via email (add email in step 1)'}
+                </button>
+              </a>
             </div>
             <p className="text-[11px] text-gray-400 mt-3.5 leading-relaxed">
-              The WhatsApp message includes the client name, service, renewal date, and invoice total. The Calendar reminder fires {form.reminderDays} day{form.reminderDays !== 1 ? 's' : ''} before the renewal date.
+              The WhatsApp message includes the client name, service, renewal date, and invoice total. The Calendar reminder fires {form.reminderDays} day{form.reminderDays !== 1 ? 's' : ''} before the renewal date. Email opens your mail client with a pre-filled message.
             </p>
           </Card>
 
