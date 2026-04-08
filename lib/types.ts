@@ -1,0 +1,44 @@
+export type Currency = 'NGN' | 'USD' | 'GBP' | 'EUR' | 'KES' | 'GHS' | 'ZAR'
+
+export interface LineItem {
+  id: string
+  desc: string
+  qty: number
+  price: number
+}
+
+export interface Profile {
+  id: string
+  full_name: string | null
+  business_name: string | null
+  business_email: string | null
+  currency: string
+  tax_rate: number
+  created_at: string
+  updated_at: string
+}
+
+export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled'
+
+export interface Invoice {
+  id: string
+  user_id: string
+  inv_number: string
+  client_name: string
+  client_email: string | null
+  client_phone: string | null
+  contact_name: string | null
+  service_name: string | null
+  service_plan: string | null
+  renewal_date: string | null
+  line_items: LineItem[]
+  subtotal: number
+  tax_rate: number
+  tax_amount: number
+  total: number
+  currency: string | null
+  status: InvoiceStatus
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
