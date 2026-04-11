@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatAmount, CURRENCY_OPTIONS } from '@/lib/format'
+import { generatePDF } from '@/lib/generatePDF'
 import type { Profile, Invoice, LineItem } from '@/lib/types'
 
 // ─── Icon sub-components ────────────────────────────────────────────────────
@@ -80,6 +81,12 @@ function EmailIcon() {
   )
 }
 
+function SpinnerIcon() {
+  return (
+    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+  )
+}
+
 // ─── Styling constants ───────────────────────────────────────────────────────
 
 const INPUT = 'w-full px-3.5 py-2.5 rounded-lg bg-surface border border-black/10 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all placeholder:text-gray-300 text-base text-gray-900'
@@ -109,13 +116,7 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   )
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string
-  children: React.ReactNode
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5 min-w-0">
       <label className="text-xs font-medium text-gray-500">{label}</label>
@@ -149,9 +150,7 @@ function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
             <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
               <div
                 className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0 transition-all ${
-                  done || active
-                    ? 'bg-brand text-white'
-                    : 'bg-surface text-gray-400'
+                  done || active ? 'bg-brand text-white' : 'bg-surface text-gray-400'
                 }`}
                 style={{ border: done || active ? '1.5px solid #1D9E75' : '1.5px solid rgba(0,0,0,0.13)' }}
               >
@@ -198,6 +197,7 @@ function InvoicePreview({ form, items, invNumber, subtotal, taxAmount, grand }: 
     : 'Upon renewal'
 
   const currency = form.currency
+  const hasBankDetails = form.bankName || form.accountName || form.accountNumber
 
   return (
     <div className="bg-white rounded-xl overflow-hidden" style={{ border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)' }}>
@@ -287,6 +287,20 @@ function InvoicePreview({ form, items, invNumber, subtotal, taxAmount, grand }: 
             <span>{formatAmount(grand, currency)}</span>
           </div>
         </div>
+
+        {/* Payment details */}
+        {hasBankDetails && (
+          <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(0,0,0,0.08)' }}>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Payment details</p>
+            <div className="text-xs text-gray-700 leading-6">
+              {form.bankName && <p><span className="text-gray-400">Bank:</span> {form.bankName}</p>}
+              {form.accountName && <p><span className="text-gray-400">Account name:</span> {form.accountName}</p>}
+              {form.accountNumber && <p><span className="text-gray-400">Account number:</span> {form.accountNumber}</p>}
+              {form.swiftCode && <p><span className="text-gray-400">SWIFT/BIC:</span> {form.swiftCode}</p>}
+              {form.iban && <p><span className="text-gray-400">IBAN:</span> {form.iban}</p>}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -308,98 +322,12 @@ interface FormData {
   bizEmail: string
   currency: string
   taxRate: number
-}
-
-// ─── PDF generation ──────────────────────────────────────────────────────────
-
-function generatePdfHtml(
-  form: FormData,
-  items: LineItem[],
-  invNumber: string,
-  subtotal: number,
-  taxAmount: number,
-  grand: number
-): string {
-  const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-  const dueDate = form.renewalDate
-    ? new Date(form.renewalDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-    : 'Upon renewal'
-
-  const currency = form.currency
-
-  const esc = (s: string) =>
-    String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-
-  const rows = items
-    .map(
-      (i) =>
-        `<tr><td>${esc(i.desc || 'Item')}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${formatAmount(i.price, currency)}</td><td style="text-align:right">${formatAmount(i.qty * i.price, currency)}</td></tr>`
-    )
-    .join('')
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8"/>
-<title>${invNumber}</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'DM Sans',Arial,sans-serif;background:#fff;color:#1a1a18;padding:40px;}
-  @media print{body{padding:20px;} @page{margin:20mm;}}
-  h1{font-size:28px;color:#1D9E75;font-family:Georgia,serif;font-weight:700;}
-  .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;}
-  .meta{font-size:12px;color:#6b6b67;line-height:1.8;text-align:right;}
-  .meta-biz{font-size:13px;font-weight:600;color:#1a1a18;}
-  .svc{font-size:12px;color:#6b6b67;margin-top:4px;}
-  .parties{display:flex;gap:24px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(0,0,0,0.10);}
-  .party-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#9e9e99;margin-bottom:4px;}
-  .party-val{font-size:12px;color:#1a1a18;line-height:1.7;}
-  table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;}
-  th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#9e9e99;text-align:left;padding:5px 0;border-bottom:1px solid rgba(0,0,0,0.10);}
-  td{padding:8px 0;border-bottom:1px solid rgba(0,0,0,0.07);color:#1a1a18;}
-  .tot{display:flex;justify-content:space-between;font-size:12px;color:#6b6b67;padding:2px 0;}
-  .grand{display:flex;justify-content:space-between;font-size:14px;font-weight:600;color:#1a1a18;border-top:1.5px solid rgba(0,0,0,0.13);padding-top:8px;margin-top:4px;}
-  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#FAEEDA;color:#633806;}
-</style>
-</head>
-<body>
-<div class="top">
-  <div>
-    <h1>Invoice</h1>
-    <div class="svc">${esc(form.serviceName || 'Service')}${form.servicePlan ? ' &mdash; ' + esc(form.servicePlan) : ''}</div>
-  </div>
-  <div class="meta">
-    <div class="meta-biz">${esc(form.bizName || 'Your Business')}</div>
-    <div>${esc(form.bizEmail)}</div>
-    <div style="margin-top:8px">${esc(invNumber)}</div>
-    <div>Issued: ${today}</div>
-    <div>Due: ${dueDate}</div>
-    <div style="margin-top:8px"><span class="badge">Pending payment</span></div>
-  </div>
-</div>
-<div class="parties">
-  <div>
-    <div class="party-label">From</div>
-    <div class="party-val">${esc(form.bizName || 'Your Business')}<br>${esc(form.bizEmail)}</div>
-  </div>
-  <div>
-    <div class="party-label">Bill to</div>
-    <div class="party-val">${esc(form.clientName || 'Client')}${form.contactName ? '<br>' + esc(form.contactName) : ''}${form.clientEmail ? '<br>' + esc(form.clientEmail) : ''}</div>
-  </div>
-</div>
-<table>
-  <thead><tr><th>Description</th><th style="text-align:center">Qty</th><th style="text-align:right">Unit price</th><th style="text-align:right">Amount</th></tr></thead>
-  <tbody>${rows}</tbody>
-</table>
-<div class="tot"><span>Subtotal</span><span>${formatAmount(subtotal, currency)}</span></div>
-<div class="tot"><span>Tax (${form.taxRate}%)</span><span>${formatAmount(taxAmount, currency)}</span></div>
-<div class="grand"><span>Total due</span><span>${formatAmount(grand, currency)}</span></div>
-</body>
-</html>`
+  bankName: string
+  accountName: string
+  accountNumber: string
+  bankCountry: string
+  swiftCode: string
+  iban: string
 }
 
 // ─── Main component ──────────────────────────────────────────────────────────
@@ -416,6 +344,12 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
   const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(invoice?.id ?? null)
   const [invNumber] = useState(() => invoice?.inv_number ?? `INV-${Date.now().toString().slice(-6)}`)
 
+  const [pdfLoading, setPdfLoading] = useState(false)
+  const [whatsappLoading, setWhatsappLoading] = useState(false)
+  const [whatsappError, setWhatsappError] = useState<string | null>(null)
+  const [emailLoading, setEmailLoading] = useState(false)
+  const [emailFeedback, setEmailFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
   const [form, setForm] = useState<FormData>({
     clientName: invoice?.client_name ?? '',
     contactName: invoice?.contact_name ?? '',
@@ -430,6 +364,12 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
     bizEmail: profile?.business_email ?? '',
     currency: invoice?.currency ?? profile?.currency ?? 'NGN',
     taxRate: invoice?.tax_rate ?? profile?.tax_rate ?? 7.5,
+    bankName: profile?.bank_name ?? '',
+    accountName: profile?.account_name ?? '',
+    accountNumber: profile?.account_number ?? '',
+    bankCountry: profile?.bank_country ?? 'Nigeria',
+    swiftCode: profile?.swift_code ?? '',
+    iban: profile?.iban ?? '',
   })
 
   const [items, setItems] = useState<LineItem[]>(
@@ -444,6 +384,33 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
   const subtotal = useMemo(() => items.reduce((s, i) => s + i.qty * i.price, 0), [items])
   const taxAmount = useMemo(() => (subtotal * form.taxRate) / 100, [subtotal, form.taxRate])
   const grand = useMemo(() => subtotal + taxAmount, [subtotal, taxAmount])
+
+  // Build the PDF data object for reuse across handlers
+  function getPDFData() {
+    return {
+      invNumber,
+      bizName: form.bizName,
+      bizEmail: form.bizEmail,
+      clientName: form.clientName,
+      contactName: form.contactName || undefined,
+      clientEmail: form.clientEmail || undefined,
+      serviceName: form.serviceName || undefined,
+      servicePlan: form.servicePlan || undefined,
+      renewalDate: form.renewalDate || undefined,
+      currency: form.currency,
+      taxRate: form.taxRate,
+      items: items.map((i) => ({ desc: i.desc, qty: i.qty, price: i.price })),
+      subtotal,
+      taxAmount,
+      grand,
+      bankName: form.bankName || undefined,
+      accountName: form.accountName || undefined,
+      accountNumber: form.accountNumber || undefined,
+      bankCountry: form.bankCountry || undefined,
+      swiftCode: form.swiftCode || undefined,
+      iban: form.iban || undefined,
+    }
+  }
 
   function addItem(desc = '', qty = 1, price = 0) {
     const id = `${Date.now()}-${Math.random()}`
@@ -498,14 +465,12 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
       }
 
       if (savedInvoiceId) {
-        // UPDATE — status is managed separately via the invoice list dropdown
         const { error } = await supabase
           .from('invoices')
           .update(payload)
           .eq('id', savedInvoiceId)
         if (error) { setSaveError(error.message); return }
       } else {
-        // INSERT — always starts as pending
         const { data, error } = await supabase
           .from('invoices')
           .insert({ ...payload, status: 'pending' as const })
@@ -528,6 +493,8 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
     setStep(1)
     setSavedInvoiceId(null)
     setItems([])
+    setEmailFeedback(null)
+    setWhatsappError(null)
     setForm({
       clientName: '',
       contactName: '',
@@ -542,17 +509,146 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
       bizEmail: profile?.business_email ?? '',
       currency: profile?.currency ?? 'NGN',
       taxRate: profile?.tax_rate ?? 7.5,
+      bankName: profile?.bank_name ?? '',
+      accountName: profile?.account_name ?? '',
+      accountNumber: profile?.account_number ?? '',
+      bankCountry: profile?.bank_country ?? 'Nigeria',
+      swiftCode: profile?.swift_code ?? '',
+      iban: profile?.iban ?? '',
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  function handleDownloadPdf() {
-    const html = generatePdfHtml(form, items, invNumber, subtotal, taxAmount, grand)
-    const win = window.open('', '_blank')
-    if (!win) return
-    win.document.write(html)
-    win.document.close()
-    setTimeout(() => win.print(), 500)
+  async function handleDownloadPdf() {
+    setPdfLoading(true)
+    try {
+      const doc = generatePDF(getPDFData())
+      const clientSlug = form.clientName.replace(/[^a-zA-Z0-9]/g, '_') || 'Client'
+      doc.save(`INV-${invNumber}-${clientSlug}.pdf`)
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
+  async function handleWhatsApp() {
+    setWhatsappLoading(true)
+    setWhatsappError(null)
+
+    const phone = form.clientPhone.replace(/\D/g, '')
+    const dueFmt = form.renewalDate
+      ? new Date(form.renewalDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+      : ''
+    const biz = form.bizName || 'us'
+    const svc = form.serviceName || 'your service'
+    const plan = form.servicePlan ? ` (${form.servicePlan})` : ''
+
+    let pdfUrl = ''
+
+    try {
+      const doc = generatePDF(getPDFData())
+      const pdfBlob = doc.output('blob')
+
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const userId = session?.user?.id
+
+      if (userId) {
+        const fileName = `${userId}/${invNumber}.pdf`
+        const { error: uploadError } = await supabase.storage
+          .from('invoices')
+          .upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true })
+
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage
+            .from('invoices')
+            .getPublicUrl(fileName)
+          pdfUrl = urlData?.publicUrl ?? ''
+        } else {
+          setWhatsappError('Could not upload PDF. WhatsApp message sent without PDF link.')
+        }
+      }
+    } catch {
+      setWhatsappError('Could not generate PDF. WhatsApp message sent without PDF link.')
+    }
+
+    const msgParts = [
+      `Hello ${form.clientName || 'there'},`,
+      ``,
+      `This is a renewal reminder from *${biz}*.`,
+      ``,
+      `Your *${svc}${plan}* is due for renewal${dueFmt ? ` on *${dueFmt}*` : ''}.`,
+      ``,
+      `Invoice total: *${formatAmount(grand, form.currency)}*`,
+      ``,
+      form.clientNotes ? `${form.clientNotes}\n` : '',
+      `Please reach out to confirm or arrange payment. Thank you!`,
+      ``,
+      pdfUrl ? `📎 Invoice PDF: ${pdfUrl}` : '',
+      ``,
+      `— ${biz}`,
+    ]
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+
+    const base = phone ? `https://wa.me/${phone}` : 'https://wa.me/'
+    window.open(`${base}?text=${encodeURIComponent(msgParts)}`, '_blank')
+    setWhatsappLoading(false)
+  }
+
+  async function handleSendEmail() {
+    if (!form.clientEmail) return
+    setEmailLoading(true)
+    setEmailFeedback(null)
+
+    try {
+      const doc = generatePDF(getPDFData())
+      // Get base64 string (without the data URI prefix)
+      const pdfBase64 = doc.output('datauristring').split(',')[1]
+
+      const res = await fetch('/api/send-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoiceData: {
+            invNumber,
+            clientName: form.clientName,
+            bizName: form.bizName,
+            bizEmail: form.bizEmail,
+            serviceName: form.serviceName,
+            servicePlan: form.servicePlan,
+            renewalDate: form.renewalDate,
+            currency: form.currency,
+            taxRate: form.taxRate,
+            items: items.map((i) => ({ desc: i.desc, qty: i.qty, price: i.price })),
+            subtotal,
+            taxAmount,
+            grand,
+            bankName: form.bankName,
+            accountName: form.accountName,
+            accountNumber: form.accountNumber,
+            swiftCode: form.swiftCode,
+            iban: form.iban,
+          },
+          recipientEmail: form.clientEmail,
+          pdfBase64,
+        }),
+      })
+
+      const json = await res.json()
+      if (!res.ok || json.error) {
+        setEmailFeedback({ type: 'error', message: json.error || 'Failed to send email.' })
+      } else {
+        setEmailFeedback({ type: 'success', message: `Invoice sent to ${form.clientEmail}` })
+      }
+    } catch (err) {
+      setEmailFeedback({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Unexpected error.',
+      })
+    } finally {
+      setEmailLoading(false)
+    }
   }
 
   function buildCalendarLink(): string {
@@ -574,73 +670,7 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
     ]
       .filter(Boolean)
       .join('\n')
-
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(evTitle)}&dates=${fmt(start)}/${fmt(end)}&details=${encodeURIComponent(evDesc)}`
-  }
-
-  function buildWhatsAppLink(): string {
-    const phone = form.clientPhone.replace(/\D/g, '')
-    const dueFmt = form.renewalDate
-      ? new Date(form.renewalDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-      : ''
-    const biz = form.bizName || 'us'
-    const svc = form.serviceName || 'your service'
-    const plan = form.servicePlan ? ` (${form.servicePlan})` : ''
-    const msg = [
-      `Hello ${form.clientName || 'there'},`,
-      ``,
-      `This is a renewal reminder from *${biz}*.`,
-      ``,
-      `Your *${svc}${plan}* is due for renewal${dueFmt ? ` on *${dueFmt}*` : ''}.`,
-      ``,
-      `Invoice total: *${formatAmount(grand, form.currency)}*`,
-      ``,
-      form.clientNotes ? `${form.clientNotes}\n` : '',
-      `Please reach out to confirm or arrange payment. Thank you!`,
-      ``,
-      `— ${biz}`,
-    ]
-      .join('\n')
-      .replace(/\n{3,}/g, '\n\n')
-
-    const base = phone ? `https://wa.me/${phone}` : 'https://wa.me/'
-    return `${base}?text=${encodeURIComponent(msg)}`
-  }
-
-  function buildEmailLink(): string {
-    const to = form.clientEmail || ''
-    const subject = encodeURIComponent(
-      `Invoice from ${form.bizName || 'us'} — ${invNumber}`
-    )
-    const dueFmt = form.renewalDate
-      ? new Date(form.renewalDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-      : ''
-    const svc = form.serviceName || 'Service'
-    const plan = form.servicePlan ? ` (${form.servicePlan})` : ''
-    const body = encodeURIComponent(
-      [
-        `Hello ${form.clientName || 'there'},`,
-        ``,
-        `Please find your invoice details below.`,
-        ``,
-        `Invoice:    ${invNumber}`,
-        `Service:    ${svc}${plan}`,
-        dueFmt ? `Due date:   ${dueFmt}` : '',
-        `Total:      ${formatAmount(grand, form.currency)}`,
-        ``,
-        form.clientNotes || '',
-        form.clientNotes ? `` : '',
-        `Please reach out if you have any questions.`,
-        ``,
-        `— ${form.bizName || 'us'}`,
-        form.bizEmail ? form.bizEmail : '',
-      ]
-        .filter((l) => l !== undefined)
-        .join('\n')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim()
-    )
-    return `mailto:${to}?subject=${subject}&body=${body}`
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -656,37 +686,16 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
             <SectionTitle>Client details</SectionTitle>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Client / company name">
-                <input
-                  className={INPUT}
-                  placeholder="Acme Corp"
-                  value={form.clientName}
-                  onChange={(e) => setField('clientName', e.target.value)}
-                />
+                <input className={INPUT} placeholder="Acme Corp" value={form.clientName} onChange={(e) => setField('clientName', e.target.value)} />
               </Field>
               <Field label="Contact person">
-                <input
-                  className={INPUT}
-                  placeholder="Jane Smith"
-                  value={form.contactName}
-                  onChange={(e) => setField('contactName', e.target.value)}
-                />
+                <input className={INPUT} placeholder="Jane Smith" value={form.contactName} onChange={(e) => setField('contactName', e.target.value)} />
               </Field>
               <Field label="Email address">
-                <input
-                  className={INPUT}
-                  type="email"
-                  placeholder="jane@acme.com"
-                  value={form.clientEmail}
-                  onChange={(e) => setField('clientEmail', e.target.value)}
-                />
+                <input className={INPUT} type="email" placeholder="jane@acme.com" value={form.clientEmail} onChange={(e) => setField('clientEmail', e.target.value)} />
               </Field>
               <Field label="WhatsApp number">
-                <input
-                  className={INPUT}
-                  placeholder="+234 800 000 0000"
-                  value={form.clientPhone}
-                  onChange={(e) => setField('clientPhone', e.target.value)}
-                />
+                <input className={INPUT} placeholder="+234 800 000 0000" value={form.clientPhone} onChange={(e) => setField('clientPhone', e.target.value)} />
               </Field>
             </div>
           </Card>
@@ -695,38 +704,16 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
             <SectionTitle>Service &amp; renewal</SectionTitle>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <Field label="Service name">
-                <input
-                  className={INPUT}
-                  placeholder="Website Hosting"
-                  value={form.serviceName}
-                  onChange={(e) => setField('serviceName', e.target.value)}
-                />
+                <input className={INPUT} placeholder="Website Hosting" value={form.serviceName} onChange={(e) => setField('serviceName', e.target.value)} />
               </Field>
               <Field label="Plan / package">
-                <input
-                  className={INPUT}
-                  placeholder="Business Annual"
-                  value={form.servicePlan}
-                  onChange={(e) => setField('servicePlan', e.target.value)}
-                />
+                <input className={INPUT} placeholder="Business Annual" value={form.servicePlan} onChange={(e) => setField('servicePlan', e.target.value)} />
               </Field>
               <Field label="Renewal date">
-                <input
-                  className={INPUT}
-                  type="date"
-                  min={new Date().toISOString().split('T')[0]}
-                  value={form.renewalDate}
-                  onChange={(e) => setField('renewalDate', e.target.value)}
-                />
+                <input className={INPUT} type="date" min={new Date().toISOString().split('T')[0]} value={form.renewalDate} onChange={(e) => setField('renewalDate', e.target.value)} />
               </Field>
               <Field label="Remind me (days before)">
-                <input
-                  className={INPUT}
-                  type="number"
-                  min={1}
-                  value={form.reminderDays}
-                  onChange={(e) => setField('reminderDays', Number(e.target.value))}
-                />
+                <input className={INPUT} type="number" min={1} value={form.reminderDays} onChange={(e) => setField('reminderDays', Number(e.target.value))} />
               </Field>
             </div>
             <Field label="Message / notes for client">
@@ -743,44 +730,20 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
             <SectionTitle>Your business</SectionTitle>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Business name">
-                <input
-                  className={INPUT}
-                  placeholder="Your Agency Ltd"
-                  value={form.bizName}
-                  onChange={(e) => setField('bizName', e.target.value)}
-                />
+                <input className={INPUT} placeholder="Your Agency Ltd" value={form.bizName} onChange={(e) => setField('bizName', e.target.value)} />
               </Field>
               <Field label="Your email">
-                <input
-                  className={INPUT}
-                  type="email"
-                  placeholder="hello@yourbusiness.com"
-                  value={form.bizEmail}
-                  onChange={(e) => setField('bizEmail', e.target.value)}
-                />
+                <input className={INPUT} type="email" placeholder="hello@yourbusiness.com" value={form.bizEmail} onChange={(e) => setField('bizEmail', e.target.value)} />
               </Field>
               <Field label="Currency">
-                <select
-                  className={INPUT}
-                  value={form.currency}
-                  onChange={(e) => setField('currency', e.target.value)}
-                >
+                <select className={INPUT} value={form.currency} onChange={(e) => setField('currency', e.target.value)}>
                   {CURRENCY_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
               </Field>
               <Field label="Tax / VAT %">
-                <input
-                  className={INPUT}
-                  type="number"
-                  min={0}
-                  step={0.5}
-                  value={form.taxRate}
-                  onChange={(e) => setField('taxRate', Number(e.target.value))}
-                />
+                <input className={INPUT} type="number" min={0} step={0.5} value={form.taxRate} onChange={(e) => setField('taxRate', Number(e.target.value))} />
               </Field>
             </div>
           </Card>
@@ -819,42 +782,19 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
                   {items.map((item) => (
                     <tr key={item.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                       <td className="py-1.5 pr-2">
-                        <input
-                          className="w-full bg-transparent outline-none text-sm text-gray-800 placeholder:text-gray-300 focus:border-b focus:border-brand"
-                          placeholder="e.g. Website hosting"
-                          value={item.desc}
-                          onChange={(e) => updateItem(item.id, 'desc', e.target.value)}
-                        />
+                        <input className="w-full bg-transparent outline-none text-sm text-gray-800 placeholder:text-gray-300 focus:border-b focus:border-brand" placeholder="e.g. Website hosting" value={item.desc} onChange={(e) => updateItem(item.id, 'desc', e.target.value)} />
                       </td>
                       <td className="py-1.5 pr-2">
-                        <input
-                          className="w-12 bg-transparent outline-none text-sm text-gray-800 focus:border-b focus:border-brand"
-                          type="number"
-                          min={1}
-                          value={item.qty}
-                          onChange={(e) => updateItem(item.id, 'qty', Number(e.target.value))}
-                        />
+                        <input className="w-12 bg-transparent outline-none text-sm text-gray-800 focus:border-b focus:border-brand" type="number" min={1} value={item.qty} onChange={(e) => updateItem(item.id, 'qty', Number(e.target.value))} />
                       </td>
                       <td className="py-1.5 pr-2">
-                        <input
-                          className="w-20 bg-transparent outline-none text-sm text-gray-800 focus:border-b focus:border-brand"
-                          type="number"
-                          min={0}
-                          step={0.01}
-                          value={item.price}
-                          onChange={(e) => updateItem(item.id, 'price', Number(e.target.value))}
-                        />
+                        <input className="w-20 bg-transparent outline-none text-sm text-gray-800 focus:border-b focus:border-brand" type="number" min={0} step={0.01} value={item.price} onChange={(e) => updateItem(item.id, 'price', Number(e.target.value))} />
                       </td>
                       <td className="py-1.5 text-sm font-medium text-gray-800 whitespace-nowrap">
                         {formatAmount(item.qty * item.price, form.currency)}
                       </td>
                       <td className="py-1.5 text-right">
-                        <button
-                          onClick={() => removeItem(item.id)}
-                          className="text-gray-300 hover:text-red-500 transition-colors text-lg leading-none px-1"
-                        >
-                          ×
-                        </button>
+                        <button onClick={() => removeItem(item.id)} className="text-gray-300 hover:text-red-500 transition-colors text-lg leading-none px-1">×</button>
                       </td>
                     </tr>
                   ))}
@@ -865,85 +805,42 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
             {/* Mobile cards */}
             <div className="sm:hidden space-y-2 mb-4">
               {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-surface rounded-lg p-3"
-                  style={{ border: '1px solid rgba(0,0,0,0.08)' }}
-                >
+                <div key={item.id} className="bg-surface rounded-lg p-3" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-xs font-semibold text-gray-400">Item</span>
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="text-gray-300 hover:text-red-500 transition-colors text-lg leading-none"
-                    >
-                      ×
-                    </button>
+                    <button onClick={() => removeItem(item.id)} className="text-gray-300 hover:text-red-500 transition-colors text-lg leading-none">×</button>
                   </div>
                   <div className="mb-2">
                     <label className="text-[11px] text-gray-400 font-medium block mb-1">Description</label>
-                    <input
-                      className="w-full bg-transparent outline-none text-sm text-gray-800 placeholder:text-gray-300 border-b border-black/10 focus:border-brand py-1"
-                      placeholder="e.g. Website hosting"
-                      value={item.desc}
-                      onChange={(e) => updateItem(item.id, 'desc', e.target.value)}
-                    />
+                    <input className="w-full bg-transparent outline-none text-sm text-gray-800 placeholder:text-gray-300 border-b border-black/10 focus:border-brand py-1" placeholder="e.g. Website hosting" value={item.desc} onChange={(e) => updateItem(item.id, 'desc', e.target.value)} />
                   </div>
                   <div className="flex gap-3">
                     <div className="flex-1">
                       <label className="text-[11px] text-gray-400 font-medium block mb-1">Qty</label>
-                      <input
-                        className="w-full bg-transparent outline-none text-sm text-gray-800 border-b border-black/10 focus:border-brand py-1"
-                        type="number"
-                        min={1}
-                        value={item.qty}
-                        onChange={(e) => updateItem(item.id, 'qty', Number(e.target.value))}
-                      />
+                      <input className="w-full bg-transparent outline-none text-sm text-gray-800 border-b border-black/10 focus:border-brand py-1" type="number" min={1} value={item.qty} onChange={(e) => updateItem(item.id, 'qty', Number(e.target.value))} />
                     </div>
                     <div className="flex-[2]">
                       <label className="text-[11px] text-gray-400 font-medium block mb-1">Unit price</label>
-                      <input
-                        className="w-full bg-transparent outline-none text-sm text-gray-800 border-b border-black/10 focus:border-brand py-1"
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        value={item.price}
-                        onChange={(e) => updateItem(item.id, 'price', Number(e.target.value))}
-                      />
+                      <input className="w-full bg-transparent outline-none text-sm text-gray-800 border-b border-black/10 focus:border-brand py-1" type="number" min={0} step={0.01} value={item.price} onChange={(e) => updateItem(item.id, 'price', Number(e.target.value))} />
                     </div>
                     <div className="flex-1 text-right">
                       <label className="text-[11px] text-gray-400 font-medium block mb-1">Amount</label>
-                      <span className="text-sm font-semibold text-gray-800">
-                        {formatAmount(item.qty * item.price, form.currency)}
-                      </span>
+                      <span className="text-sm font-semibold text-gray-800">{formatAmount(item.qty * item.price, form.currency)}</span>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Add item button */}
-            <button
-              onClick={() => addItem()}
-              className="flex items-center gap-2 text-sm text-gray-600 bg-white border border-black/[0.12] hover:bg-gray-50 px-3 py-2 rounded-lg transition-colors mb-4"
-            >
+            <button onClick={() => addItem()} className="flex items-center gap-2 text-sm text-gray-600 bg-white border border-black/[0.12] hover:bg-gray-50 px-3 py-2 rounded-lg transition-colors mb-4">
               <PlusSmall />
               Add line item
             </button>
 
-            {/* Totals */}
             <div className="flex flex-col gap-1 pt-3" style={{ borderTop: '1px solid rgba(0,0,0,0.08)' }}>
-              <div className="flex justify-between text-sm text-gray-500 py-0.5">
-                <span>Subtotal</span>
-                <span>{formatAmount(subtotal, form.currency)}</span>
-              </div>
-              <div className="flex justify-between text-sm text-gray-500 py-0.5">
-                <span>Tax ({form.taxRate}%)</span>
-                <span>{formatAmount(taxAmount, form.currency)}</span>
-              </div>
-              <div
-                className="flex justify-between text-base font-semibold text-gray-900 py-2.5 mt-1"
-                style={{ borderTop: '1.5px solid rgba(0,0,0,0.13)' }}
-              >
+              <div className="flex justify-between text-sm text-gray-500 py-0.5"><span>Subtotal</span><span>{formatAmount(subtotal, form.currency)}</span></div>
+              <div className="flex justify-between text-sm text-gray-500 py-0.5"><span>Tax ({form.taxRate}%)</span><span>{formatAmount(taxAmount, form.currency)}</span></div>
+              <div className="flex justify-between text-base font-semibold text-gray-900 py-2.5 mt-1" style={{ borderTop: '1.5px solid rgba(0,0,0,0.13)' }}>
                 <span>Total due</span>
                 <span>{formatAmount(grand, form.currency)}</span>
               </div>
@@ -951,26 +848,17 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
           </Card>
 
           <div className="flex gap-2.5 mt-1">
-            <button
-              onClick={() => { setStep(1); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-              className="flex items-center gap-2 px-4 py-3 bg-white border border-black/[0.12] text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
-            >
+            <button onClick={() => { setStep(1); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="flex items-center gap-2 px-4 py-3 bg-white border border-black/[0.12] text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
               <ChevLeft />
               Back
             </button>
-            <button
-              onClick={goStep3}
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-dark transition-colors disabled:opacity-60"
-            >
+            <button onClick={goStep3} disabled={saving} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-dark transition-colors disabled:opacity-60">
               {saving ? 'Saving…' : 'Preview & send'}
               {!saving && <ChevRight />}
             </button>
           </div>
           {saveError && (
-            <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5">
-              {saveError}
-            </p>
+            <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5">{saveError}</p>
           )}
         </div>
       )}
@@ -991,48 +879,69 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
           <Card className="mt-3">
             <SectionTitle>Schedule &amp; send</SectionTitle>
             <div className="flex flex-col gap-2.5">
+              {/* Download PDF */}
               <button
                 onClick={handleDownloadPdf}
-                className="flex items-center justify-center gap-2 w-full px-4 py-3.5 bg-white border border-black/[0.12] text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                disabled={pdfLoading}
+                className="flex items-center justify-center gap-2 w-full px-4 py-3.5 bg-[#1a1a18] hover:bg-[#2a2a26] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
               >
-                <DownloadIcon />
-                Download PDF
+                {pdfLoading ? <SpinnerIcon /> : <DownloadIcon />}
+                {pdfLoading ? 'Generating…' : 'Download PDF'}
               </button>
+
+              {/* Google Calendar */}
               <a
                 href={buildCalendarLink()}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={form.renewalDate ? '' : 'pointer-events-none opacity-50'}
               >
-                <button
-                  className="flex items-center justify-center gap-2 w-full px-4 py-3.5 bg-[#4285F4] hover:bg-[#2a70d6] text-white text-sm font-medium rounded-lg transition-colors"
-                >
+                <button className="flex items-center justify-center gap-2 w-full px-4 py-3.5 bg-[#4285F4] hover:bg-[#2a70d6] text-white text-sm font-medium rounded-lg transition-colors">
                   <CalendarIcon />
                   Add reminder to Google Calendar
                 </button>
               </a>
-              <a
-                href={buildWhatsAppLink()}
-                target="_blank"
-                rel="noopener noreferrer"
+
+              {/* WhatsApp */}
+              <button
+                onClick={handleWhatsApp}
+                disabled={whatsappLoading}
+                className="flex items-center justify-center gap-2 w-full px-4 py-3.5 bg-[#25D366] hover:bg-[#1eba58] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
               >
-                <button className="flex items-center justify-center gap-2 w-full px-4 py-3.5 bg-[#25D366] hover:bg-[#1eba58] text-white text-sm font-medium rounded-lg transition-colors">
-                  <WhatsAppIcon />
-                  Send invoice via WhatsApp
-                </button>
-              </a>
-              <a
-                href={buildEmailLink()}
-                className={form.clientEmail ? '' : 'pointer-events-none opacity-50'}
+                {whatsappLoading ? <SpinnerIcon /> : <WhatsAppIcon />}
+                {whatsappLoading ? 'Preparing…' : 'Send invoice via WhatsApp'}
+              </button>
+              {whatsappError && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{whatsappError}</p>
+              )}
+
+              {/* Send via email */}
+              <button
+                onClick={handleSendEmail}
+                disabled={emailLoading || !form.clientEmail}
+                className="flex items-center justify-center gap-2 w-full px-4 py-3.5 bg-white border border-black/[0.12] text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
-                <button className="flex items-center justify-center gap-2 w-full px-4 py-3.5 bg-white border border-black/[0.12] text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
-                  <EmailIcon />
-                  {form.clientEmail ? 'Send invoice via email' : 'Send invoice via email (add email in step 1)'}
-                </button>
-              </a>
+                {emailLoading ? <SpinnerIcon /> : <EmailIcon />}
+                {emailLoading
+                  ? 'Sending…'
+                  : form.clientEmail
+                  ? 'Send invoice via email'
+                  : 'Send invoice via email (add email in step 1)'}
+              </button>
+              {emailFeedback && (
+                <p
+                  className={`text-xs rounded-lg px-3 py-2 ${
+                    emailFeedback.type === 'success'
+                      ? 'bg-[#E1F5EE] text-[#085041] border border-[#b3dfd0]'
+                      : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}
+                >
+                  {emailFeedback.message}
+                </p>
+              )}
             </div>
             <p className="text-[11px] text-gray-400 mt-3.5 leading-relaxed">
-              The WhatsApp message includes the client name, service, renewal date, and invoice total. The Calendar reminder fires {form.reminderDays} day{form.reminderDays !== 1 ? 's' : ''} before the renewal date. Email opens your mail client with a pre-filled message.
+              PDF downloads instantly. WhatsApp uploads the PDF to storage and shares a link. Email sends the invoice with PDF attached via Resend. Calendar reminder fires {form.reminderDays} day{form.reminderDays !== 1 ? 's' : ''} before the renewal date.
             </p>
           </Card>
 

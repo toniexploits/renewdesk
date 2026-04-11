@@ -29,6 +29,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [showInternational, setShowInternational] = useState(false)
 
   const [form, setForm] = useState({
     full_name: '',
@@ -36,6 +37,12 @@ export default function SettingsPage() {
     business_email: '',
     currency: 'NGN',
     tax_rate: 7.5,
+    bank_name: '',
+    account_name: '',
+    account_number: '',
+    bank_country: 'Nigeria',
+    swift_code: '',
+    iban: '',
   })
 
   useEffect(() => {
@@ -54,13 +61,22 @@ export default function SettingsPage() {
         .single()
 
       if (profile) {
+        const swiftCode = profile.swift_code ?? ''
+        const iban = profile.iban ?? ''
         setForm({
           full_name: profile.full_name ?? '',
           business_name: profile.business_name ?? '',
           business_email: profile.business_email ?? '',
           currency: profile.currency ?? 'NGN',
           tax_rate: profile.tax_rate ?? 7.5,
+          bank_name: profile.bank_name ?? '',
+          account_name: profile.account_name ?? '',
+          account_number: profile.account_number ?? '',
+          bank_country: profile.bank_country ?? 'Nigeria',
+          swift_code: swiftCode,
+          iban: iban,
         })
+        if (swiftCode || iban) setShowInternational(true)
       }
       setLoading(false)
     }
@@ -89,6 +105,12 @@ export default function SettingsPage() {
           business_email: form.business_email || null,
           currency: form.currency,
           tax_rate: form.tax_rate,
+          bank_name: form.bank_name || null,
+          account_name: form.account_name || null,
+          account_number: form.account_number || null,
+          bank_country: form.bank_country || 'Nigeria',
+          swift_code: form.swift_code || null,
+          iban: form.iban || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', userId)
@@ -103,6 +125,11 @@ export default function SettingsPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const cardStyle = {
+    border: '1px solid rgba(0,0,0,0.08)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)',
   }
 
   return (
@@ -120,13 +147,7 @@ export default function SettingsPage() {
       ) : (
         <form onSubmit={handleSubmit}>
           {/* Profile */}
-          <div
-            className="bg-white rounded-xl p-5 mb-4"
-            style={{
-              border: '1px solid rgba(0,0,0,0.08)',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)',
-            }}
-          >
+          <div className="bg-white rounded-xl p-5 mb-4" style={cardStyle}>
             <SectionTitle>Your profile</SectionTitle>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Full name">
@@ -141,13 +162,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Business */}
-          <div
-            className="bg-white rounded-xl p-5 mb-4"
-            style={{
-              border: '1px solid rgba(0,0,0,0.08)',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)',
-            }}
-          >
+          <div className="bg-white rounded-xl p-5 mb-4" style={cardStyle}>
             <SectionTitle>Business defaults</SectionTitle>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Business name">
@@ -191,6 +206,89 @@ export default function SettingsPage() {
                 />
               </Field>
             </div>
+          </div>
+
+          {/* Payment details */}
+          <div className="bg-white rounded-xl p-5 mb-4" style={cardStyle}>
+            <SectionTitle>Payment details</SectionTitle>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <Field label="Bank name">
+                <input
+                  className={INPUT}
+                  placeholder="First Bank Nigeria"
+                  value={form.bank_name}
+                  onChange={(e) => setField('bank_name', e.target.value)}
+                />
+              </Field>
+              <Field label="Account name">
+                <input
+                  className={INPUT}
+                  placeholder="Jane Smith"
+                  value={form.account_name}
+                  onChange={(e) => setField('account_name', e.target.value)}
+                />
+              </Field>
+              <Field label="Account number">
+                <input
+                  className={INPUT}
+                  placeholder="0123456789"
+                  value={form.account_number}
+                  onChange={(e) => setField('account_number', e.target.value)}
+                />
+              </Field>
+              <Field label="Country">
+                <input
+                  className={INPUT}
+                  placeholder="Nigeria"
+                  value={form.bank_country}
+                  onChange={(e) => setField('bank_country', e.target.value)}
+                />
+              </Field>
+            </div>
+
+            {/* International toggle */}
+            <button
+              type="button"
+              onClick={() => setShowInternational((v) => !v)}
+              className="flex items-center gap-2 text-sm text-brand font-medium hover:text-brand-dark transition-colors"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`transition-transform ${showInternational ? 'rotate-45' : ''}`}
+              >
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              {showInternational ? 'Hide international details' : 'Add international details'}
+            </button>
+
+            {showInternational && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-4" style={{ borderTop: '1px solid rgba(0,0,0,0.07)' }}>
+                <Field label="SWIFT / BIC code">
+                  <input
+                    className={INPUT}
+                    placeholder="FBNINGLA"
+                    value={form.swift_code}
+                    onChange={(e) => setField('swift_code', e.target.value)}
+                  />
+                </Field>
+                <Field label="IBAN">
+                  <input
+                    className={INPUT}
+                    placeholder="GB29 NWBK 6016 1331 9268 19"
+                    value={form.iban}
+                    onChange={(e) => setField('iban', e.target.value)}
+                  />
+                </Field>
+              </div>
+            )}
           </div>
 
           {/* Feedback */}

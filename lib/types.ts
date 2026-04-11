@@ -14,6 +14,12 @@ export interface Profile {
   business_email: string | null
   currency: string
   tax_rate: number
+  bank_name: string | null
+  account_name: string | null
+  account_number: string | null
+  bank_country: string
+  swift_code: string | null
+  iban: string | null
   created_at: string
   updated_at: string
 }

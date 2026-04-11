@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>RenewDesk — Client Renewal Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --brand:#1D9E75;
+  --brand-dark:#0F6E56;
+  --surface:#F7F6F2;
+  --card-shadow:0 1px 3px rgba(0,0,0,0.07),0 4px 16px rgba(0,0,0,0.04);
+  --card-border:1px solid rgba(0,0,0,0.08);
+  --ink:#1a1a18;
+  --gray:#6b6b67;
+  --light-gray:#9e9e99;
+}
+body{font-family:'DM Sans',Arial,sans-serif;background:var(--surface);color:var(--ink);min-height:100vh;}
+.page{max-width:680px;margin:0 auto;padding:20px 16px 60px;}
+h1.logo{font-size:20px;font-weight:700;color:var(--brand);letter-spacing:-0.02em;margin-bottom:20px;}
+/* Cards */
+.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;border:var(--card-border);box-shadow:var(--card-shadow);}
+/* Section title */
+.section-title{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+.section-title .dot{width:6px;height:6px;border-radius:50%;background:var(--brand);flex-shrink:0;}
+.section-title span{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:var(--light-gray);}
+/* Grid */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:500px){.grid2{grid-template-columns:1fr;}}
+/* Field */
+.field{display:flex;flex-direction:column;gap:6px;}
+.field label{font-size:12px;font-weight:500;color:var(--gray);}
+.field input,.field select,.field textarea{
+  width:100%;padding:10px 14px;border-radius:8px;background:var(--surface);
+  border:1px solid rgba(0,0,0,0.10);outline:none;font-family:inherit;font-size:16px;
+  color:var(--ink);transition:border-color 0.15s,box-shadow 0.15s;
+}
+.field input:focus,.field select:focus,.field textarea:focus{
+  border-color:var(--brand);box-shadow:0 0 0 3px rgba(29,158,117,0.15);
+}
+.field input::placeholder,.field textarea::placeholder{color:#c8c8c4;}
+.field textarea{resize:vertical;min-height:80px;line-height:1.5;}
+/* Step indicator */
+.steps{display:flex;align-items:center;background:#fff;border-radius:12px;padding:12px;margin-bottom:12px;border:var(--card-border);box-shadow:var(--card-shadow);}
+.step-item{display:flex;align-items:center;gap:8px;flex:1;min-width:0;overflow:hidden;}
+.step-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;border:1.5px solid rgba(0,0,0,0.13);background:var(--surface);color:var(--light-gray);transition:all 0.2s;}
+.step-num.active,.step-num.done{background:var(--brand);color:#fff;border-color:var(--brand);}
+.step-text{overflow:hidden;}
+.step-text p{font-size:11px;font-weight:500;color:var(--light-gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.step-text p.active{color:var(--ink);}
+.step-text small{font-size:10px;color:var(--light-gray);}
+.step-sep{width:12px;height:1px;background:rgba(0,0,0,0.10);flex-shrink:0;margin:0 4px;}
+/* Buttons */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px 16px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;border:none;transition:background 0.15s,opacity 0.15s;}
+.btn:disabled{opacity:0.55;cursor:not-allowed;}
+.btn-brand{background:var(--brand);color:#fff;}
+.btn-brand:hover:not(:disabled){background:var(--brand-dark);}
+.btn-dark{background:var(--ink);color:#fff;}
+.btn-dark:hover:not(:disabled){background:#2a2a26;}
+.btn-ghost{background:#fff;color:#444;border:1px solid rgba(0,0,0,0.12);}
+.btn-ghost:hover:not(:disabled){background:#f5f4f0;}
+.btn-wa{background:#25D366;color:#fff;}
+.btn-wa:hover:not(:disabled){background:#1eba58;}
+.btn-cal{background:#4285F4;color:#fff;}
+.btn-cal:hover:not(:disabled){background:#2a70d6;}
+.btn-back{background:#fff;color:#555;border:1px solid rgba(0,0,0,0.12);width:auto;padding:12px 16px;}
+.btn-back:hover{background:#f5f4f0;}
+.btn-row{display:flex;gap:10px;margin-top:4px;}
+.btn-row .btn{flex:1;}
+/* Line items */
+.items-table{width:100%;font-size:13px;border-collapse:collapse;}
+.items-table th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--light-gray);text-align:left;padding:0 0 8px;border-bottom:1px solid rgba(0,0,0,0.08);}
+.items-table td{padding:8px 0;border-bottom:1px solid rgba(0,0,0,0.05);}
+.items-table input{background:transparent;border:none;outline:none;font-family:inherit;font-size:13px;color:var(--ink);width:100%;border-bottom:1px solid transparent;}
+.items-table input:focus{border-bottom-color:var(--brand);}
+.items-table .rm{background:none;border:none;cursor:pointer;color:#ccc;font-size:18px;line-height:1;padding:0 4px;}
+.items-table .rm:hover{color:#ef4444;}
+.totals{padding-top:12px;border-top:1px solid rgba(0,0,0,0.08);}
+.total-row{display:flex;justify-content:space-between;font-size:13px;color:var(--gray);padding:3px 0;}
+.total-grand{display:flex;justify-content:space-between;font-size:15px;font-weight:600;color:var(--ink);padding:10px 0 4px;border-top:1.5px solid rgba(0,0,0,0.13);margin-top:4px;}
+/* Invoice preview */
+.inv-preview{background:#fff;border-radius:12px;overflow:hidden;border:var(--card-border);box-shadow:var(--card-shadow);}
+.inv-body{padding:16px;}
+.inv-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;}
+.inv-title{font-size:26px;font-weight:700;color:var(--brand);font-family:Georgia,serif;}
+.inv-svc{font-size:12px;color:var(--light-gray);margin-top:4px;}
+.inv-meta{font-size:12px;color:var(--light-gray);line-height:1.8;text-align:right;}
+.inv-meta-biz{font-size:13px;font-weight:600;color:var(--ink);}
+.inv-badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;background:#FEF3C7;color:#92400E;margin-top:4px;}
+.inv-parties{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.08);}
+.party-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--light-gray);margin-bottom:4px;}
+.party-val{font-size:12px;color:var(--ink);line-height:1.7;}
+.inv-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px;}
+.inv-table th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--light-gray);text-align:left;padding:4px 0;border-bottom:1px solid rgba(0,0,0,0.08);}
+.inv-table td{padding:8px 0;border-bottom:1px solid rgba(0,0,0,0.05);color:var(--ink);}
+.inv-total-row{display:flex;justify-content:space-between;font-size:12px;color:var(--gray);padding:2px 0;}
+.inv-grand{display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:var(--ink);padding:8px 0 4px;border-top:1.5px solid rgba(0,0,0,0.13);margin-top:4px;}
+.payment-section{margin-top:14px;padding-top:14px;border-top:1px solid rgba(0,0,0,0.08);}
+.payment-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--light-gray);margin-bottom:6px;}
+.payment-val{font-size:12px;color:var(--ink);line-height:1.8;}
+.payment-val span{color:var(--light-gray);}
+/* Int'l toggle */
+.intl-toggle{background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;font-size:14px;font-weight:500;color:var(--brand);padding:0;margin-top:8px;}
+.intl-toggle:hover{color:var(--brand-dark);}
+.intl-section{margin-top:14px;padding-top:14px;border-top:1px solid rgba(0,0,0,0.07);}
+/* Feedback */
+.feedback-success{background:#E1F5EE;color:#085041;border:1px solid #b3dfd0;border-radius:8px;padding:10px 14px;font-size:13px;margin-top:8px;}
+.feedback-error{background:#FEF2F2;color:#b91c1c;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;font-size:13px;margin-top:8px;}
+/* Spinner */
+@keyframes spin{to{transform:rotate(360deg);}}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;}
+/* Separator */
+.mb3{margin-bottom:10px;}
+.mt1{margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1 class="logo">RenewDesk</h1>
+
+  <!-- Step indicator -->
+  <div class="steps" id="step-indicator"></div>
+
+  <!-- STEP 1 -->
+  <div id="step1">
+    <div class="card">
+      <div class="section-title"><div class="dot"></div><span>Client details</span></div>
+      <div class="grid2">
+        <div class="field"><label>Client / company name</label><input id="clientName" placeholder="Acme Corp"/></div>
+        <div class="field"><label>Contact person</label><input id="contactName" placeholder="Jane Smith"/></div>
+        <div class="field"><label>Email address</label><input id="clientEmail" type="email" placeholder="jane@acme.com"/></div>
+        <div class="field"><label>WhatsApp number</label><input id="clientPhone" placeholder="+234 800 000 0000"/></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title"><div class="dot"></div><span>Service &amp; renewal</span></div>
+      <div class="grid2 mb3">
+        <div class="field"><label>Service name</label><input id="serviceName" placeholder="Website Hosting"/></div>
+        <div class="field"><label>Plan / package</label><input id="servicePlan" placeholder="Business Annual"/></div>
+        <div class="field"><label>Renewal date</label><input id="renewalDate" type="date"/></div>
+        <div class="field"><label>Remind me (days before)</label><input id="reminderDays" type="number" value="7" min="1"/></div>
+      </div>
+      <div class="field"><label>Message / notes for client</label><textarea id="clientNotes" placeholder="Your subscription is due for renewal. Please find your invoice attached…"></textarea></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title"><div class="dot"></div><span>Your business</span></div>
+      <div class="grid2">
+        <div class="field"><label>Business name</label><input id="bizName" placeholder="Your Agency Ltd"/></div>
+        <div class="field"><label>Your email</label><input id="bizEmail" type="email" placeholder="hello@yourbusiness.com"/></div>
+        <div class="field">
+          <label>Currency</label>
+          <select id="currency">
+            <option value="NGN">NGN — ₦ Nigerian Naira</option>
+            <option value="USD">USD — $ US Dollar</option>
+            <option value="GBP">GBP — £ British Pound</option>
+            <option value="EUR">EUR — € Euro</option>
+            <option value="KES">KES — KSh Kenyan Shilling</option>
+            <option value="GHS">GHS — GH₵ Ghanaian Cedi</option>
+            <option value="ZAR">ZAR — R South African Rand</option>
+          </select>
+        </div>
+        <div class="field"><label>Tax / VAT %</label><input id="taxRate" type="number" value="7.5" min="0" step="0.5"/></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title"><div class="dot"></div><span>Payment details</span></div>
+      <div class="grid2">
+        <div class="field"><label>Bank name</label><input id="bankName" placeholder="First Bank Nigeria"/></div>
+        <div class="field"><label>Account name</label><input id="accountName" placeholder="Jane Smith"/></div>
+        <div class="field"><label>Account number</label><input id="accountNumber" placeholder="0123456789"/></div>
+        <div class="field"><label>Country</label><input id="bankCountry" placeholder="Nigeria" value="Nigeria"/></div>
+      </div>
+
+      <button class="intl-toggle" id="intlToggle" onclick="toggleIntl()">
+        <svg id="intlIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span id="intlLabel">Add international details</span>
+      </button>
+
+      <div class="intl-section" id="intlSection" style="display:none;">
+        <div class="grid2">
+          <div class="field"><label>SWIFT / BIC code</label><input id="swiftCode" placeholder="FBNINGLA"/></div>
+          <div class="field"><label>IBAN</label><input id="iban" placeholder="GB29 NWBK 6016 1331 9268 19"/></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row mt1">
+      <button class="btn btn-brand" onclick="goStep2()">
+        Continue to invoice
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div id="step2" style="display:none;">
+    <div class="card">
+      <div class="section-title"><div class="dot"></div><span>Invoice line items</span></div>
+      <div style="overflow-x:auto;">
+        <table class="items-table" id="itemsTable">
+          <thead>
+            <tr>
+              <th style="width:45%">Description</th>
+              <th style="width:12%">Qty</th>
+              <th style="width:20%">Unit price</th>
+              <th style="width:16%">Amount</th>
+              <th style="width:7%"></th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody"></tbody>
+        </table>
+      </div>
+
+      <button onclick="addItem()" style="display:flex;align-items:center;gap:8px;font-family:inherit;font-size:13px;color:#555;background:#fff;border:1px solid rgba(0,0,0,0.12);padding:8px 12px;border-radius:8px;cursor:pointer;margin-top:12px;margin-bottom:14px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add line item
+      </button>
+
+      <div class="totals" id="totals"></div>
+    </div>
+
+    <div class="btn-row mt1">
+      <button class="btn-back btn" onclick="goStep1()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
+      <button class="btn btn-brand" onclick="goStep3()">
+        Preview &amp; send
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div id="step3" style="display:none;">
+    <div class="inv-preview" id="invoicePreview"></div>
+
+    <div class="card" style="margin-top:12px;">
+      <div class="section-title"><div class="dot"></div><span>Schedule &amp; send</span></div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+
+        <button class="btn btn-dark" id="pdfBtn" onclick="handleDownloadPDF()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download PDF
+        </button>
+
+        <button class="btn btn-cal" id="calBtn" onclick="openCalendar()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Add reminder to Google Calendar
+        </button>
+
+        <button class="btn btn-wa" id="waBtn" onclick="openWhatsApp()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.978-1.392A9.96 9.96 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 01-4.073-1.119l-.292-.173-3.014.842.857-2.939-.19-.301A8 8 0 1112 20z"/></svg>
+          Send invoice via WhatsApp
+        </button>
+
+      </div>
+      <p style="font-size:11px;color:var(--light-gray);margin-top:14px;line-height:1.6;">
+        PDF downloads instantly to your device. WhatsApp message includes a note to reply for the PDF (standalone version cannot upload files). Calendar reminder fires before the renewal date.
+      </p>
+    </div>
+
+    <div class="btn-row mt1">
+      <button class="btn-back btn" onclick="goStep2()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Edit invoice
+      </button>
+      <button class="btn btn-brand" onclick="startOver()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.33"/></svg>
+        New renewal
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let currentStep = 1
+let items = []
+let invNumber = 'INV-' + Date.now().toString().slice(-6)
+let intlOpen = false
+
+// ─── Currency helpers ─────────────────────────────────────────────────────────
+const SYMBOLS = {NGN:'₦',USD:'$',GBP:'£',EUR:'€',KES:'KSh ',GHS:'GH₵ ',ZAR:'R '}
+function sym(c){return SYMBOLS[c]||''}
+function fmt(n,c){return sym(c)+Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',')}
+
+// ─── Form getters ─────────────────────────────────────────────────────────────
+function g(id){return (document.getElementById(id)||{}).value||''}
+function getForm(){
+  return {
+    clientName:g('clientName'),contactName:g('contactName'),
+    clientEmail:g('clientEmail'),clientPhone:g('clientPhone'),
+    serviceName:g('serviceName'),servicePlan:g('servicePlan'),
+    renewalDate:g('renewalDate'),reminderDays:parseInt(g('reminderDays'))||7,
+    clientNotes:g('clientNotes'),bizName:g('bizName'),bizEmail:g('bizEmail'),
+    currency:g('currency')||'NGN',taxRate:parseFloat(g('taxRate'))||0,
+    bankName:g('bankName'),accountName:g('accountName'),
+    accountNumber:g('accountNumber'),bankCountry:g('bankCountry'),
+    swiftCode:g('swiftCode'),iban:g('iban'),
+  }
+}
+
+// ─── Totals ───────────────────────────────────────────────────────────────────
+function getSubtotal(){return items.reduce((s,i)=>s+i.qty*i.price,0)}
+function getTax(subtotal,rate){return subtotal*rate/100}
+function getGrand(){const s=getSubtotal();const t=getTax(s,parseFloat(g('taxRate'))||0);return s+t}
+
+// ─── Step indicator ───────────────────────────────────────────────────────────
+function renderSteps(){
+  const defs=[
+    {n:1,label:'Client & Service',sub:'Details & schedule'},
+    {n:2,label:'Invoice',sub:'Items & pricing'},
+    {n:3,label:'Preview & Send',sub:'Calendar + WhatsApp'},
+  ]
+  document.getElementById('step-indicator').innerHTML = defs.map((s,i)=>{
+    const done=s.n<currentStep, active=s.n===currentStep
+    const numClass=done||active?'active':''
+    const numContent=done?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':s.n
+    const sep=i<defs.length-1?'<div class="step-sep"></div>':''
+    return `
+      <div class="step-item">
+        <div class="step-num ${numClass}">${numContent}</div>
+        <div class="step-text">
+          <p class="${active?'active':''}">${s.label}</p>
+          <small>${s.sub}</small>
+        </div>
+      </div>${sep}`
+  }).join('')
+}
+
+// ─── Navigation ───────────────────────────────────────────────────────────────
+function showStep(n){
+  currentStep=n
+  document.getElementById('step1').style.display=n===1?'block':'none'
+  document.getElementById('step2').style.display=n===2?'block':'none'
+  document.getElementById('step3').style.display=n===3?'block':'none'
+  renderSteps()
+  window.scrollTo({top:0,behavior:'smooth'})
+}
+
+function goStep1(){showStep(1)}
+function goStep2(){
+  if(items.length===0){
+    const svc=g('serviceName')||'Service renewal'
+    addItem(svc,1,0)
+  }
+  renderItems()
+  showStep(2)
+}
+function goStep3(){renderPreview();showStep(3)}
+function startOver(){
+  items=[]
+  invNumber='INV-'+Date.now().toString().slice(-6)
+  showStep(1)
+}
+
+// ─── International toggle ─────────────────────────────────────────────────────
+function toggleIntl(){
+  intlOpen=!intlOpen
+  document.getElementById('intlSection').style.display=intlOpen?'block':'none'
+  document.getElementById('intlLabel').textContent=intlOpen?'Hide international details':'Add international details'
+  const icon=document.getElementById('intlIcon')
+  icon.style.transform=intlOpen?'rotate(45deg)':''
+}
+
+// ─── Line items ───────────────────────────────────────────────────────────────
+function addItem(desc='',qty=1,price=0){
+  const id=Date.now()+'-'+Math.random()
+  items.push({id,desc,qty,price})
+  renderItems()
+}
+
+function removeItem(id){
+  items=items.filter(i=>i.id!==id)
+  renderItems()
+}
+
+function renderItems(){
+  const currency=g('currency')||'NGN'
+  const tbody=document.getElementById('itemsBody')
+  tbody.innerHTML=items.map(item=>`
+    <tr>
+      <td><input value="${esc(item.desc)}" placeholder="e.g. Website hosting" onchange="updateItem('${item.id}','desc',this.value)" oninput="updateItem('${item.id}','desc',this.value)"/></td>
+      <td><input type="number" min="1" value="${item.qty}" style="width:50px" onchange="updateItem('${item.id}','qty',+this.value)" oninput="updateItem('${item.id}','qty',+this.value)"/></td>
+      <td><input type="number" min="0" step="0.01" value="${item.price}" style="width:80px" onchange="updateItem('${item.id}','price',+this.value)" oninput="updateItem('${item.id}','price',+this.value)"/></td>
+      <td style="font-weight:600;">${fmt(item.qty*item.price,currency)}</td>
+      <td><button class="rm" onclick="removeItem('${item.id}')">×</button></td>
+    </tr>`).join('')
+
+  const subtotal=getSubtotal()
+  const rate=parseFloat(g('taxRate'))||0
+  const taxAmt=getTax(subtotal,rate)
+  const grand=subtotal+taxAmt
+  document.getElementById('totals').innerHTML=`
+    <div class="total-row"><span>Subtotal</span><span>${fmt(subtotal,currency)}</span></div>
+    <div class="total-row"><span>Tax (${rate}%)</span><span>${fmt(taxAmt,currency)}</span></div>
+    <div class="total-grand"><span>Total due</span><span>${fmt(grand,currency)}</span></div>`
+}
+
+function updateItem(id,field,value){
+  const item=items.find(i=>i.id===id)
+  if(item)item[field]=field==='desc'?value:Number(value)||0
+  renderItems()
+}
+
+// ─── Invoice preview ──────────────────────────────────────────────────────────
+function renderPreview(){
+  const f=getForm()
+  const currency=f.currency
+  const subtotal=getSubtotal()
+  const taxAmt=getTax(subtotal,f.taxRate)
+  const grand=subtotal+taxAmt
+  const today=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})
+  const dueDate=f.renewalDate
+    ? new Date(f.renewalDate+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})
+    : 'Upon renewal'
+
+  const rows=items.map(i=>`
+    <tr>
+      <td>${esc(i.desc||'Item')}</td>
+      <td style="text-align:center">${i.qty}</td>
+      <td style="text-align:right">${fmt(i.price,currency)}</td>
+      <td style="text-align:right;font-weight:600">${fmt(i.qty*i.price,currency)}</td>
+    </tr>`).join('')
+
+  const bankHtml = (f.bankName||f.accountName||f.accountNumber) ? `
+    <div class="payment-section">
+      <div class="payment-label">Payment details</div>
+      <div class="payment-val">
+        ${f.bankName?`<div><span>Bank:</span> ${esc(f.bankName)}</div>`:''}
+        ${f.accountName?`<div><span>Account name:</span> ${esc(f.accountName)}</div>`:''}
+        ${f.accountNumber?`<div><span>Account number:</span> ${esc(f.accountNumber)}</div>`:''}
+        ${f.swiftCode?`<div><span>SWIFT/BIC:</span> ${esc(f.swiftCode)}</div>`:''}
+        ${f.iban?`<div><span>IBAN:</span> ${esc(f.iban)}</div>`:''}
+      </div>
+    </div>` : ''
+
+  document.getElementById('invoicePreview').innerHTML=`
+    <div class="inv-body">
+      <div class="inv-header">
+        <div>
+          <div class="inv-title">Invoice</div>
+          <div class="inv-svc">${esc(f.serviceName||'Service')}${f.servicePlan?' — '+esc(f.servicePlan):''}</div>
+        </div>
+        <div class="inv-meta">
+          <div class="inv-meta-biz">${esc(f.bizName||'Your Business')}</div>
+          <div>${esc(f.bizEmail)}</div>
+          <div style="margin-top:6px">${esc(invNumber)}</div>
+          <div>Issued: ${today}</div>
+          <div>Due: ${dueDate}</div>
+          <div><span class="inv-badge">Draft</span></div>
+        </div>
+      </div>
+      <div class="inv-parties">
+        <div>
+          <div class="party-label">From</div>
+          <div class="party-val">${esc(f.bizName||'Your Business')}<br/>${esc(f.bizEmail)}</div>
+        </div>
+        <div>
+          <div class="party-label">Bill to</div>
+          <div class="party-val">${esc(f.clientName||'Client')}${f.contactName?'<br/>'+esc(f.contactName):''}${f.clientEmail?'<br/>'+esc(f.clientEmail):''}</div>
+        </div>
+      </div>
+      <table class="inv-table">
+        <thead><tr>
+          <th>Description</th><th style="text-align:center">Qty</th>
+          <th style="text-align:right">Unit price</th><th style="text-align:right">Amount</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="inv-total-row"><span>Subtotal</span><span>${fmt(subtotal,currency)}</span></div>
+      <div class="inv-total-row"><span>Tax (${f.taxRate}%)</span><span>${fmt(taxAmt,currency)}</span></div>
+      <div class="inv-grand"><span>Total due</span><span>${fmt(grand,currency)}</span></div>
+      ${bankHtml}
+    </div>`
+}
+
+// ─── PDF download ─────────────────────────────────────────────────────────────
+function handleDownloadPDF(){
+  const btn=document.getElementById('pdfBtn')
+  btn.disabled=true
+  btn.innerHTML='<span class="spin"></span> Generating…'
+
+  try{
+    const doc=buildPDF()
+    const f=getForm()
+    const slug=(f.clientName||'Client').replace(/[^a-zA-Z0-9]/g,'_')
+    doc.save('INV-'+invNumber+'-'+slug+'.pdf')
+  }catch(e){
+    alert('PDF generation failed: '+e.message)
+  }
+
+  btn.disabled=false
+  btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download PDF'
+}
+
+function buildPDF(){
+  const {jsPDF}=window.jspdf
+  const doc=new jsPDF({unit:'mm',format:'a4'})
+  const f=getForm()
+  const currency=f.currency
+  const subtotal=getSubtotal()
+  const taxAmt=getTax(subtotal,f.taxRate)
+  const grand=subtotal+taxAmt
+
+  const margin=20, right=190
+  const today=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})
+  const dueDate=f.renewalDate
+    ? new Date(f.renewalDate+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})
+    : 'Upon renewal'
+
+  let y=margin
+
+  // Title
+  doc.setFont('helvetica','bold')
+  doc.setFontSize(28)
+  doc.setTextColor(29,158,117)
+  doc.text('Invoice',margin,y+8)
+
+  const svc=[f.serviceName,f.servicePlan].filter(Boolean).join(' — ')
+  if(svc){
+    doc.setFont('helvetica','normal')
+    doc.setFontSize(9)
+    doc.setTextColor(107,107,103)
+    doc.text(svc,margin,y+15)
+  }
+
+  // Business (right)
+  doc.setFont('helvetica','bold')
+  doc.setFontSize(11)
+  doc.setTextColor(26,26,24)
+  doc.text(f.bizName||'Your Business',right,y+6,{align:'right'})
+  doc.setFont('helvetica','normal')
+  doc.setFontSize(9)
+  doc.setTextColor(107,107,103)
+  if(f.bizEmail) doc.text(f.bizEmail,right,y+12,{align:'right'})
+  doc.text(invNumber,right,y+19,{align:'right'})
+  doc.text('Issued: '+today,right,y+25,{align:'right'})
+  doc.text('Due: '+dueDate,right,y+31,{align:'right'})
+  y+=38
+
+  doc.setDrawColor(0,0,0)
+  doc.setLineWidth(0.2)
+  doc.line(margin,y,right,y)
+  y+=7
+
+  const half=margin+(right-margin)/2
+  doc.setFont('helvetica','bold')
+  doc.setFontSize(8)
+  doc.setTextColor(158,158,153)
+  doc.text('FROM',margin,y)
+  doc.text('BILL TO',half,y)
+  y+=4
+  doc.setFont('helvetica','normal')
+  doc.setFontSize(9)
+  doc.setTextColor(26,26,24)
+  doc.text(f.bizName||'Your Business',margin,y)
+  if(f.bizEmail) doc.text(f.bizEmail,margin,y+5)
+  doc.text(f.clientName||'Client',half,y)
+  let billY=y+5
+  if(f.contactName){doc.text(f.contactName,half,billY);billY+=5}
+  if(f.clientEmail){doc.text(f.clientEmail,half,billY);billY+=5}
+  y+=18
+
+  doc.setDrawColor(0,0,0)
+  doc.setLineWidth(0.2)
+  doc.line(margin,y,right,y)
+  y+=7
+
+  // Table header
+  doc.setFont('helvetica','bold')
+  doc.setFontSize(8)
+  doc.setTextColor(158,158,153)
+  doc.text('DESCRIPTION',margin,y)
+  doc.text('QTY',margin+100,y,{align:'center'})
+  doc.text('UNIT PRICE',margin+130,y,{align:'right'})
+  doc.text('AMOUNT',right,y,{align:'right'})
+  y+=3
+  doc.setDrawColor(0,0,0)
+  doc.setLineWidth(0.2)
+  doc.line(margin,y,right,y)
+  y+=5
+
+  doc.setFont('helvetica','normal')
+  doc.setFontSize(9)
+  doc.setTextColor(26,26,24)
+  items.forEach(item=>{
+    const desc=item.desc||'Item'
+    const maxW=80
+    const truncated=doc.getTextWidth(desc)>maxW
+      ? doc.splitTextToSize(desc,maxW)[0]+'…' : desc
+    doc.text(truncated,margin,y)
+    doc.text(String(item.qty),margin+100,y,{align:'center'})
+    doc.text(fmt(item.price,currency),margin+130,y,{align:'right'})
+    doc.text(fmt(item.qty*item.price,currency),right,y,{align:'right'})
+    y+=7
+    doc.setDrawColor(220,220,218)
+    doc.setLineWidth(0.15)
+    doc.line(margin,y-1.5,right,y-1.5)
+  })
+  y+=4
+
+  const totX=margin+70
+  doc.setFontSize(9)
+  doc.setTextColor(107,107,103)
+  doc.text('Subtotal',totX,y)
+  doc.text(fmt(subtotal,currency),right,y,{align:'right'})
+  y+=6
+  doc.text('Tax ('+f.taxRate+'%)',totX,y)
+  doc.text(fmt(taxAmt,currency),right,y,{align:'right'})
+  y+=4
+  doc.setDrawColor(0,0,0)
+  doc.setLineWidth(0.4)
+  doc.line(totX,y,right,y)
+  y+=5
+  doc.setFont('helvetica','bold')
+  doc.setFontSize(10)
+  doc.setTextColor(26,26,24)
+  doc.text('Total due',totX,y)
+  doc.text(fmt(grand,currency),right,y,{align:'right'})
+  y+=12
+
+  // Payment details
+  if(f.bankName||f.accountName||f.accountNumber){
+    doc.setDrawColor(0,0,0)
+    doc.setLineWidth(0.2)
+    doc.line(margin,y,right,y)
+    y+=7
+    doc.setFont('helvetica','bold')
+    doc.setFontSize(8)
+    doc.setTextColor(158,158,153)
+    doc.text('PAYMENT DETAILS',margin,y)
+    y+=5
+    doc.setFont('helvetica','normal')
+    doc.setFontSize(9)
+    doc.setTextColor(26,26,24)
+    if(f.bankName){doc.text('Bank: '+f.bankName,margin,y);y+=5}
+    if(f.accountName){doc.text('Account name: '+f.accountName,margin,y);y+=5}
+    if(f.accountNumber){doc.text('Account number: '+f.accountNumber,margin,y);y+=5}
+    if(f.swiftCode){doc.text('SWIFT/BIC: '+f.swiftCode,margin,y);y+=5}
+    if(f.iban){doc.text('IBAN: '+f.iban,margin,y);y+=5}
+  }
+
+  doc.setFont('helvetica','normal')
+  doc.setFontSize(8)
+  doc.setTextColor(158,158,153)
+  doc.text('Generated with RenewDesk',margin,282)
+
+  return doc
+}
+
+// ─── WhatsApp ─────────────────────────────────────────────────────────────────
+function openWhatsApp(){
+  const f=getForm()
+  const grand=getGrand()
+  const currency=f.currency
+  const phone=f.clientPhone.replace(/\D/g,'')
+  const dueFmt=f.renewalDate
+    ? new Date(f.renewalDate+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})
+    : ''
+  const biz=f.bizName||'us'
+  const svc=f.serviceName||'your service'
+  const plan=f.servicePlan?' ('+f.servicePlan+')':''
+
+  const msg=[
+    'Hello '+(f.clientName||'there')+',',
+    '',
+    'This is a renewal reminder from *'+biz+'*.',
+    '',
+    'Your *'+svc+plan+'* is due for renewal'+(dueFmt?' on *'+dueFmt+'*':'')+'.',
+    '',
+    'Invoice total: *'+fmt(grand,currency)+'*',
+    '',
+    f.clientNotes?f.clientNotes+'\n':'',
+    'Please reach out to confirm or arrange payment.',
+    '',
+    '📎 Reply to this message and we will send you the invoice PDF.',
+    '',
+    '— '+biz,
+  ].join('\n').replace(/\n{3,}/g,'\n\n').trim()
+
+  const base=phone?'https://wa.me/'+phone:'https://wa.me/'
+  window.open(base+'?text='+encodeURIComponent(msg),'_blank')
+}
+
+// ─── Google Calendar ──────────────────────────────────────────────────────────
+function openCalendar(){
+  const f=getForm()
+  const grand=getGrand()
+  if(!f.renewalDate){alert('Please set a renewal date in step 1.');return}
+  const start=new Date(f.renewalDate+'T00:00:00')
+  start.setDate(start.getDate()-(f.reminderDays||7))
+  const end=new Date(start)
+  end.setHours(end.getHours()+1)
+  const fmtDate=d=>d.toISOString().replace(/[-:]/g,'').split('.')[0]+'Z'
+  const dueFmt=new Date(f.renewalDate+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})
+  const title='Renewal reminder: '+(f.clientName||'Client')+' — '+(f.serviceName||'Service')
+  const desc=[
+    'Client: '+(f.clientName||'Client'),
+    'Service: '+(f.serviceName||'Service'),
+    f.servicePlan?'Plan: '+f.servicePlan:'',
+    'Renewal date: '+dueFmt,
+    'Invoice total: '+fmt(grand,f.currency),
+    f.clientNotes?'\nNotes: '+f.clientNotes:'',
+  ].filter(Boolean).join('\n')
+  const url='https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(title)+'&dates='+fmtDate(start)+'/'+fmtDate(end)+'&details='+encodeURIComponent(desc)
+  window.open(url,'_blank')
+}
+
+// ─── HTML escape ──────────────────────────────────────────────────────────────
+function esc(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+renderSteps()
+</script>
+</body>
+</html>
