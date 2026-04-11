@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import type { Invoice, InvoiceStatus } from '@/lib/types'
+import type { Invoice, InvoiceStatus, Profile } from '@/lib/types'
 import { formatAmount } from '@/lib/format'
 import InvoiceRow from '@/components/InvoiceRow'
 
@@ -19,13 +19,14 @@ const TABS: { key: FilterTab; label: string }[] = [
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<FilterTab>('all')
 
   useEffect(() => {
     const supabase = createClient()
     let channel: ReturnType<typeof supabase.channel> | null = null
-    let active = true  // guards against StrictMode double-invoke and stale closures
+    let active = true
 
     async function fetchInvoices(userId: string) {
       const { data } = await supabase
@@ -43,13 +44,20 @@ export default function InvoicesPage() {
       const { data: { session } } = await supabase.auth.getSession()
       const user = session?.user
       if (!user) { if (active) setLoading(false); return }
-      if (!active) return  // effect was cleaned up before getSession() resolved
+      if (!active) return
 
       const userId = user.id
-      await fetchInvoices(userId)
-      if (!active) return  // effect was cleaned up before fetch resolved
 
-      // Synchronous chain: channel → .on() → .subscribe()
+      // Fetch profile and invoices in parallel
+      const [, profileResult] = await Promise.all([
+        fetchInvoices(userId),
+        supabase.from('profiles').select('*').eq('id', userId).single(),
+      ])
+      if (active && profileResult.data) {
+        setProfile(profileResult.data as Profile)
+      }
+      if (!active) return
+
       channel = supabase
         .channel(`invoices-${userId}`)
         .on(
@@ -79,16 +87,13 @@ export default function InvoicesPage() {
     setInvoices((prev) => prev.map((i) => (i.id === id ? { ...i, status } : i)))
   }
 
-  // Counts per tab
   function countFor(tab: FilterTab) {
     if (tab === 'all') return invoices.length
     return invoices.filter((i) => i.status === tab).length
   }
 
-  // Filtered list
   const filtered = activeTab === 'all' ? invoices : invoices.filter((i) => i.status === activeTab)
 
-  // Stats (only shown when there are invoices)
   const currency = invoices[0]?.currency ?? 'NGN'
   const outstanding = invoices
     .filter((i) => i.status === 'pending' || i.status === 'overdue')
@@ -115,7 +120,7 @@ export default function InvoicesPage() {
         </Link>
       </div>
 
-      {/* Summary stats row */}
+      {/* Summary stats */}
       {!loading && invoices.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
           <StatCard label="Total" value={String(invoices.length)} />
@@ -194,9 +199,7 @@ export default function InvoicesPage() {
                 </Link>
               </>
             ) : (
-              <p className="text-sm text-gray-400">
-                No {activeTab} invoices
-              </p>
+              <p className="text-sm text-gray-400">No {activeTab} invoices</p>
             )}
           </div>
         ) : (
@@ -207,15 +210,17 @@ export default function InvoicesPage() {
               style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}
             >
               <div className="flex-1 text-[11px] font-semibold uppercase tracking-widest text-gray-400">Client</div>
-              <div className="w-28 text-right text-[11px] font-semibold uppercase tracking-widest text-gray-400">Date</div>
+              <div className="hidden md:block w-24 text-right text-[11px] font-semibold uppercase tracking-widest text-gray-400">Date</div>
               <div className="w-24 text-right text-[11px] font-semibold uppercase tracking-widest text-gray-400">Total</div>
-              <div className="w-28 text-right text-[11px] font-semibold uppercase tracking-widest text-gray-400">Status</div>
-              <div className="w-6" />
+              <div className="w-24 text-right text-[11px] font-semibold uppercase tracking-widest text-gray-400">Status</div>
+              <div className="hidden md:block w-24 text-right text-[11px] font-semibold uppercase tracking-widest text-gray-400">Actions</div>
+              <div className="w-16" />
             </div>
             {filtered.map((invoice) => (
               <InvoiceRow
                 key={invoice.id}
                 invoice={invoice}
+                profile={profile}
                 onDelete={handleDelete}
                 onStatusChange={handleStatusChange}
               />

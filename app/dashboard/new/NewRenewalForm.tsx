@@ -524,7 +524,7 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
     try {
       const doc = generatePDF(getPDFData())
       const clientSlug = form.clientName.replace(/[^a-zA-Z0-9]/g, '_') || 'Client'
-      doc.save(`INV-${invNumber}-${clientSlug}.pdf`)
+      doc.save(`${invNumber}-${clientSlug}.pdf`)
     } finally {
       setPdfLoading(false)
     }

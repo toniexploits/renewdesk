@@ -290,9 +290,13 @@ let invNumber = 'INV-' + Date.now().toString().slice(-6)
 let intlOpen = false
 
 // ─── Currency helpers ─────────────────────────────────────────────────────────
+// fmt() — for on-screen display (uses Unicode symbols)
 const SYMBOLS = {NGN:'₦',USD:'$',GBP:'£',EUR:'€',KES:'KSh ',GHS:'GH₵ ',ZAR:'R '}
 function sym(c){return SYMBOLS[c]||''}
 function fmt(n,c){return sym(c)+Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',')}
+// pdfFmt() — for jsPDF output only (ASCII-safe prefixes; Helvetica cannot render ₦ etc.)
+const PDF_PREFIX={NGN:'NGN ',USD:'USD ',GBP:'GBP ',EUR:'EUR ',KES:'KES ',GHS:'GHS ',ZAR:'ZAR '}
+function pdfFmt(n,c){return (PDF_PREFIX[c]||c+' ')+Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',')}
 
 // ─── Form getters ─────────────────────────────────────────────────────────────
 function g(id){return (document.getElementById(id)||{}).value||''}
@@ -495,7 +499,7 @@ function handleDownloadPDF(){
     const doc=buildPDF()
     const f=getForm()
     const slug=(f.clientName||'Client').replace(/[^a-zA-Z0-9]/g,'_')
-    doc.save('INV-'+invNumber+'-'+slug+'.pdf')
+    doc.save(invNumber+'-'+slug+'.pdf')
   }catch(e){
     alert('PDF generation failed: '+e.message)
   }
@@ -547,7 +551,14 @@ function buildPDF(){
   doc.text(invNumber,right,y+19,{align:'right'})
   doc.text('Issued: '+today,right,y+25,{align:'right'})
   doc.text('Due: '+dueDate,right,y+31,{align:'right'})
-  y+=38
+  // Pending payment badge (standalone always shows pending)
+  doc.setFillColor(254,243,199)
+  doc.roundedRect(right-52,y+35,52,7,1.5,1.5,'F')
+  doc.setFont('helvetica','bold')
+  doc.setFontSize(8)
+  doc.setTextColor(146,64,14)
+  doc.text('Pending payment',right-26,y+40.5,{align:'center'})
+  y+=48
 
   doc.setDrawColor(0,0,0)
   doc.setLineWidth(0.2)
@@ -601,8 +612,8 @@ function buildPDF(){
       ? doc.splitTextToSize(desc,maxW)[0]+'…' : desc
     doc.text(truncated,margin,y)
     doc.text(String(item.qty),margin+100,y,{align:'center'})
-    doc.text(fmt(item.price,currency),margin+130,y,{align:'right'})
-    doc.text(fmt(item.qty*item.price,currency),right,y,{align:'right'})
+    doc.text(pdfFmt(item.price,currency),margin+130,y,{align:'right'})
+    doc.text(pdfFmt(item.qty*item.price,currency),right,y,{align:'right'})
     y+=7
     doc.setDrawColor(220,220,218)
     doc.setLineWidth(0.15)
@@ -614,10 +625,10 @@ function buildPDF(){
   doc.setFontSize(9)
   doc.setTextColor(107,107,103)
   doc.text('Subtotal',totX,y)
-  doc.text(fmt(subtotal,currency),right,y,{align:'right'})
+  doc.text(pdfFmt(subtotal,currency),right,y,{align:'right'})
   y+=6
   doc.text('Tax ('+f.taxRate+'%)',totX,y)
-  doc.text(fmt(taxAmt,currency),right,y,{align:'right'})
+  doc.text(pdfFmt(taxAmt,currency),right,y,{align:'right'})
   y+=4
   doc.setDrawColor(0,0,0)
   doc.setLineWidth(0.4)
@@ -627,7 +638,7 @@ function buildPDF(){
   doc.setFontSize(10)
   doc.setTextColor(26,26,24)
   doc.text('Total due',totX,y)
-  doc.text(fmt(grand,currency),right,y,{align:'right'})
+  doc.text(pdfFmt(grand,currency),right,y,{align:'right'})
   y+=12
 
   // Payment details

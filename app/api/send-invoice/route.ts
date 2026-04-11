@@ -211,7 +211,7 @@ export async function POST(req: NextRequest) {
 
     const subject = `Invoice ${invoiceData.invNumber} from ${invoiceData.bizName || 'us'}`
     const html = buildEmailHtml(invoiceData, recipientEmail)
-    const filename = `INV-${invoiceData.invNumber}-${invoiceData.clientName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
+    const filename = `${invoiceData.invNumber}-${invoiceData.clientName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
 
     const { data, error } = await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'invoices@resend.dev',
