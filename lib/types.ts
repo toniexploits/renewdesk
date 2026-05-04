@@ -48,3 +48,30 @@ export interface Invoice {
   created_at: string
   updated_at: string
 }
+
+export type QuoteStatus = 'draft' | 'sent' | 'approved' | 'converted'
+
+export interface Quote {
+  id: string
+  user_id: string
+  quote_number: string
+  client_name: string
+  client_email: string | null
+  client_phone: string | null
+  contact_name: string | null
+  service_name: string | null
+  service_plan: string | null
+  validity_days: number
+  valid_until: string | null
+  line_items: LineItem[]
+  subtotal: number
+  tax_rate: number
+  tax_amount: number
+  total: number
+  currency: string | null
+  notes: string | null
+  status: QuoteStatus
+  converted_invoice_id: string | null
+  created_at: string
+  updated_at: string
+}
