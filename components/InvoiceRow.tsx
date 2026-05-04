@@ -98,6 +98,31 @@ function SpinnerIcon({ size = 14, color }: { size?: number; color: string }) {
   )
 }
 
+const STATUS_DOT_COLORS: Record<InvoiceStatus, string> = {
+  pending:   '#f59e0b',
+  paid:      '#1D9E75',
+  overdue:   '#ef4444',
+  cancelled: '#9ca3af',
+}
+
+function StatusDot({ status }: { status: InvoiceStatus }) {
+  return (
+    <span
+      className="flex-shrink-0 w-4 h-4 flex items-center justify-center"
+    >
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          background: STATUS_DOT_COLORS[status],
+          display: 'inline-block',
+        }}
+      />
+    </span>
+  )
+}
+
 function DotsIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -540,6 +565,24 @@ export default function InvoiceRow({
                       disabled={anyLoading || noEmail}
                       iconColor="#1D9E75"
                     />
+
+                    {/* Divider */}
+                    <div style={{ height: 1, background: '#f0ede6', margin: '4px 0' }} />
+
+                    {/* Status options — only non-current statuses */}
+                    {STATUS_OPTIONS.filter((s) => s !== invoice.status).map((s) => (
+                      <button
+                        key={s}
+                        className="w-full flex items-center gap-3 px-4 text-left hover:bg-gray-50 transition-colors"
+                        style={{ minHeight: 44 }}
+                        onClick={() => { setMenuOpen(false); handleStatusChange(s) }}
+                      >
+                        <StatusDot status={s} />
+                        <span className="text-[14px] font-medium text-gray-700">
+                          Mark as {s.charAt(0).toUpperCase() + s.slice(1)}
+                        </span>
+                      </button>
+                    ))}
 
                     {/* Divider */}
                     <div style={{ height: 1, background: '#f0ede6', margin: '4px 0' }} />
