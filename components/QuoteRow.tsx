@@ -58,10 +58,6 @@ export default function QuoteRow({ quote, profile, onDelete, onUpdate, readonly 
       })
     : '—'
 
-  const createdFmt = new Date(quote.created_at).toLocaleDateString('en-GB', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  })
-
   useEffect(() => {
     function onCloseMenus() { setMenuOpen(false) }
     document.addEventListener(CLOSE_MENUS_EVENT, onCloseMenus)
