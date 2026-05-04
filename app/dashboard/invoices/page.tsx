@@ -204,16 +204,16 @@ export default function InvoicesPage() {
           </div>
         ) : (
           <div>
-            {/* Table header */}
+            {/* Table header — desktop only (matches md+ row layout) */}
             <div
-              className="hidden sm:flex items-center gap-3 px-4 py-2"
+              className="hidden md:flex items-center gap-3 px-4 py-2"
               style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}
             >
               <div className="flex-1 text-[11px] font-semibold uppercase tracking-widest text-gray-400">Client</div>
-              <div className="hidden md:block w-24 text-right text-[11px] font-semibold uppercase tracking-widest text-gray-400">Date</div>
+              <div className="w-24 text-right text-[11px] font-semibold uppercase tracking-widest text-gray-400">Date</div>
               <div className="w-24 text-right text-[11px] font-semibold uppercase tracking-widest text-gray-400">Total</div>
               <div className="w-24 text-right text-[11px] font-semibold uppercase tracking-widest text-gray-400">Status</div>
-              <div className="hidden md:block w-24 text-right text-[11px] font-semibold uppercase tracking-widest text-gray-400">Actions</div>
+              <div className="w-24 text-right text-[11px] font-semibold uppercase tracking-widest text-gray-400">Actions</div>
               <div className="w-16" />
             </div>
             {filtered.map((invoice) => (

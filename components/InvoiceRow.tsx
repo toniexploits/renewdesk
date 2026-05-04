@@ -8,6 +8,10 @@ import { formatAmount } from '@/lib/format'
 import StatusBadge from '@/components/StatusBadge'
 import { generatePDF, invoiceToPDFData } from '@/lib/generatePDF'
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const CLOSE_MENUS_EVENT = 'renewdesk:close-menus'
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface InvoiceRowProps {
@@ -50,11 +54,22 @@ function EmailIcon({ size = 14 }: { size?: number }) {
   )
 }
 
-function EditIcon() {
+function EditIcon({ size = 14 }: { size?: number }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    </svg>
+  )
+}
+
+function DeleteIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6"/>
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+      <path d="M10 11v6M14 11v6"/>
+      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
     </svg>
   )
 }
@@ -119,7 +134,7 @@ const ACTION_CONFIG = {
   },
 } as const
 
-// ─── Inline icon action button (desktop) ─────────────────────────────────────
+// ─── Inline icon action button (desktop only) ─────────────────────────────────
 
 function InlineActionBtn({
   type,
@@ -137,8 +152,6 @@ function InlineActionBtn({
   onClick: () => void
 }) {
   const cfg = ACTION_CONFIG[type]
-  const isActive = loading || success || hasError
-
   return (
     <button
       onClick={onClick}
@@ -154,13 +167,49 @@ function InlineActionBtn({
       ) : (
         <cfg.Icon />
       )}
-      {/* suppress unused var lint */}
-      {isActive && null}
     </button>
   )
 }
 
-// ─── STATUS_OPTIONS ───────────────────────────────────────────────────────────
+// ─── Dropdown menu item ───────────────────────────────────────────────────────
+
+function DropdownItem({
+  icon,
+  label,
+  loading,
+  success,
+  onClick,
+  disabled,
+  iconColor,
+}: {
+  icon: React.ReactNode
+  label: string
+  loading?: boolean
+  success?: boolean
+  onClick?: () => void
+  disabled?: boolean
+  iconColor?: string
+}) {
+  return (
+    <button
+      className="w-full flex items-center gap-3 px-4 text-left hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      style={{ minHeight: 44, color: iconColor }}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+        {loading
+          ? <SpinnerIcon size={14} color={iconColor ?? '#1a1a18'} />
+          : success
+          ? <CheckIcon size={14} />
+          : icon}
+      </span>
+      <span className="text-[14px] font-medium text-gray-700">{label}</span>
+    </button>
+  )
+}
+
+// ─── Status options ───────────────────────────────────────────────────────────
 
 const STATUS_OPTIONS: InvoiceStatus[] = ['pending', 'paid', 'overdue', 'cancelled']
 
@@ -175,16 +224,14 @@ export default function InvoiceRow({
 }: InvoiceRowProps) {
   const supabase = createClient()
 
-  // Action state
   const [actionLoading, setActionLoading] = useState<ActionType | null>(null)
   const [actionSuccess, setActionSuccess] = useState<ActionType | null>(null)
   const [actionError, setActionError] = useState<{ type: ActionType; message: string } | null>(null)
 
-  // Mobile dots menu
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Close menu on outside click
+  // Close on outside click
   useEffect(() => {
     if (!menuOpen) return
     function handleOutside(e: MouseEvent) {
@@ -195,6 +242,24 @@ export default function InvoiceRow({
     document.addEventListener('mousedown', handleOutside)
     return () => document.removeEventListener('mousedown', handleOutside)
   }, [menuOpen])
+
+  // Close when another row opens its menu
+  useEffect(() => {
+    function handleCloseMenus() { setMenuOpen(false) }
+    document.addEventListener(CLOSE_MENUS_EVENT, handleCloseMenus)
+    return () => document.removeEventListener(CLOSE_MENUS_EVENT, handleCloseMenus)
+  }, [])
+
+  function toggleMenu() {
+    if (menuOpen) {
+      setMenuOpen(false)
+    } else {
+      // Close every other row's menu, then open ours.
+      // React 18 batches the resulting setMenuOpen(false) + setMenuOpen(true).
+      document.dispatchEvent(new CustomEvent(CLOSE_MENUS_EVENT))
+      setMenuOpen(true)
+    }
+  }
 
   function markSuccess(type: ActionType) {
     setActionSuccess(type)
@@ -208,7 +273,7 @@ export default function InvoiceRow({
 
   const anyLoading = actionLoading !== null
 
-  // ── PDF handler ─────────────────────────────────────────────────────────────
+  // ── PDF handler ──────────────────────────────────────────────────────────────
 
   async function handlePDF() {
     if (anyLoading) return
@@ -300,7 +365,7 @@ export default function InvoiceRow({
     setActionLoading(null)
   }
 
-  // ── Email handler ─────────────────────────────────────────────────────────────
+  // ── Email handler ────────────────────────────────────────────────────────────
 
   async function handleEmail() {
     if (anyLoading || !invoice.client_email) return
@@ -378,15 +443,164 @@ export default function InvoiceRow({
       })
     : '—'
 
+  const renewalDateShort = invoice.renewal_date
+    ? new Date(invoice.renewal_date + 'T00:00:00').toLocaleDateString('en-GB', {
+        day: 'numeric', month: 'short',
+      })
+    : null
+
   const noEmail = !invoice.client_email
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes dropdown-in {
+          from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+          to   { opacity: 1; transform: scale(1)    translateY(0);    }
+        }
+      `}</style>
+
+      {/* ══ MOBILE LAYOUT (below md) ══════════════════════════════════════════ */}
       <div
-        className="flex items-center gap-2 sm:gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+        className="md:hidden px-4 py-4 hover:bg-gray-50 transition-colors"
+        style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}
+        onClick={() => {/* stub: future invoice detail view */}}
+      >
+        {/* Row 1: invoice number · amount · ⋯ button */}
+        <div className="flex items-start justify-between">
+          <span className="text-[12px] text-gray-400 font-medium mt-px tabular-nums">
+            {invoice.inv_number}
+          </span>
+
+          <div
+            className="flex items-center gap-1.5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="text-[15px] font-bold text-gray-900 tabular-nums">
+              {formatAmount(invoice.total, invoice.currency ?? 'NGN')}
+            </span>
+
+            {!readonly && (
+              <div className="relative" ref={menuRef}>
+                {/* ⋯ trigger */}
+                <button
+                  onClick={toggleMenu}
+                  disabled={anyLoading}
+                  className="w-9 h-9 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 transition-colors disabled:opacity-40"
+                  title="Invoice actions"
+                  aria-label="Invoice actions"
+                >
+                  {anyLoading
+                    ? <SpinnerIcon color={ACTION_CONFIG[actionLoading as ActionType]?.color ?? '#9e9e99'} />
+                    : <DotsIcon />
+                  }
+                </button>
+
+                {/* Dropdown panel */}
+                {menuOpen && (
+                  <div
+                    className="absolute right-0 top-full mt-1.5 z-50 bg-white rounded-lg min-w-[200px] overflow-hidden"
+                    style={{
+                      border: '1px solid #e5e7eb',
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)',
+                      animation: 'dropdown-in 0.12s ease-out',
+                    }}
+                  >
+                    {/* PDF */}
+                    <DropdownItem
+                      icon={<PdfIcon size={15} />}
+                      label="Download PDF"
+                      loading={actionLoading === 'pdf'}
+                      success={actionSuccess === 'pdf'}
+                      onClick={handlePDF}
+                      disabled={anyLoading}
+                    />
+
+                    {/* WhatsApp */}
+                    <DropdownItem
+                      icon={<WAIcon size={15} />}
+                      label="Send via WhatsApp"
+                      loading={actionLoading === 'whatsapp'}
+                      success={actionSuccess === 'whatsapp'}
+                      onClick={handleWhatsApp}
+                      disabled={anyLoading}
+                      iconColor="#25D366"
+                    />
+
+                    {/* Email */}
+                    <DropdownItem
+                      icon={<EmailIcon size={15} />}
+                      label={noEmail ? 'Email (no address)' : 'Send via email'}
+                      loading={actionLoading === 'email'}
+                      success={actionSuccess === 'email'}
+                      onClick={noEmail ? undefined : handleEmail}
+                      disabled={anyLoading || noEmail}
+                      iconColor="#1D9E75"
+                    />
+
+                    {/* Divider */}
+                    <div style={{ height: 1, background: '#f0ede6', margin: '4px 0' }} />
+
+                    {/* Edit */}
+                    <Link
+                      href={`/dashboard/new?edit=${invoice.id}`}
+                      className="flex items-center gap-3 px-4 hover:bg-gray-50 transition-colors"
+                      style={{ minHeight: 44 }}
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-gray-400">
+                        <EditIcon size={15} />
+                      </span>
+                      <span className="text-[14px] font-medium text-gray-700">Edit invoice</span>
+                    </Link>
+
+                    {/* Delete */}
+                    <button
+                      className="w-full flex items-center gap-3 px-4 text-left hover:bg-red-50 transition-colors"
+                      style={{ minHeight: 44 }}
+                      onClick={() => { setMenuOpen(false); handleDelete() }}
+                    >
+                      <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-red-500">
+                        <DeleteIcon size={15} />
+                      </span>
+                      <span className="text-[14px] font-medium text-red-600">Delete invoice</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Row 2: client name · status badge */}
+        <div className="flex items-center justify-between gap-2 mt-1">
+          <p className="text-[14px] font-bold text-gray-900 truncate leading-snug">
+            {invoice.client_name}
+          </p>
+          <div className="flex-shrink-0">
+            <StatusBadge status={invoice.status} />
+          </div>
+        </div>
+
+        {/* Row 3: service · due date */}
+        {(invoice.service_name || renewalDateShort) && (
+          <p className="text-[12px] text-gray-400 mt-0.5 leading-relaxed">
+            {[
+              invoice.service_name,
+              renewalDateShort ? `Due ${renewalDateShort}` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        )}
+      </div>
+
+      {/* ══ DESKTOP LAYOUT (md+) ═════════════════════════════════════════════ */}
+      <div
+        className="hidden md:flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
         style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}
       >
         {/* Client info */}
@@ -397,20 +611,20 @@ export default function InvoiceRow({
           </p>
         </div>
 
-        {/* Renewal date — md+ only */}
-        <div className="hidden md:block w-24 text-right flex-shrink-0">
+        {/* Renewal date */}
+        <div className="w-24 text-right flex-shrink-0">
           <p className="text-xs text-gray-500">{renewalDate}</p>
         </div>
 
         {/* Total */}
-        <div className="w-20 sm:w-24 text-right flex-shrink-0">
+        <div className="w-24 text-right flex-shrink-0">
           <p className="text-sm font-semibold text-gray-900">
             {formatAmount(invoice.total, invoice.currency ?? 'NGN')}
           </p>
         </div>
 
         {/* Status */}
-        <div className="w-20 sm:w-24 flex-shrink-0 flex justify-end">
+        <div className="w-24 flex-shrink-0 flex justify-end">
           {readonly ? (
             <StatusBadge status={invoice.status} />
           ) : (
@@ -428,9 +642,9 @@ export default function InvoiceRow({
           )}
         </div>
 
-        {/* ── Action buttons — desktop (md+) ── */}
+        {/* Action buttons */}
         {!readonly && (
-          <div className="hidden md:flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <InlineActionBtn
               type="pdf"
               loading={actionLoading === 'pdf'}
@@ -458,72 +672,6 @@ export default function InvoiceRow({
           </div>
         )}
 
-        {/* ── Action buttons — mobile (dots menu) ── */}
-        {!readonly && (
-          <div className="md:hidden relative flex-shrink-0" ref={menuRef}>
-            <button
-              onClick={() => setMenuOpen((v) => !v)}
-              disabled={anyLoading}
-              className="w-8 h-8 flex items-center justify-center rounded-md border border-gray-200 text-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-40"
-              title="Invoice actions"
-            >
-              {anyLoading ? (
-                <SpinnerIcon
-                  color={
-                    ACTION_CONFIG[actionLoading as ActionType]?.color ?? '#9e9e99'
-                  }
-                />
-              ) : (
-                <DotsIcon />
-              )}
-            </button>
-
-            {menuOpen && (
-              <div
-                className="absolute right-0 top-full mt-1 z-20 bg-white rounded-xl py-1 min-w-[180px]"
-                style={{
-                  border: '1px solid rgba(0,0,0,0.10)',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
-                }}
-              >
-                {/* PDF */}
-                <button
-                  onClick={handlePDF}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors text-left"
-                  style={{ color: ACTION_CONFIG.pdf.color }}
-                >
-                  {actionSuccess === 'pdf' ? <CheckIcon size={15} /> : <PdfIcon size={15} />}
-                  <span className="font-medium text-gray-700">Download PDF</span>
-                </button>
-
-                {/* WhatsApp */}
-                <button
-                  onClick={handleWhatsApp}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors text-left"
-                  style={{ color: ACTION_CONFIG.whatsapp.color }}
-                >
-                  {actionSuccess === 'whatsapp' ? <CheckIcon size={15} /> : <WAIcon size={15} />}
-                  <span className="font-medium text-gray-700">Send via WhatsApp</span>
-                </button>
-
-                {/* Email */}
-                <button
-                  onClick={noEmail ? undefined : handleEmail}
-                  disabled={noEmail}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{ color: ACTION_CONFIG.email.color }}
-                  title={noEmail ? 'No client email on file' : 'Send invoice via email'}
-                >
-                  {actionSuccess === 'email' ? <CheckIcon size={15} /> : <EmailIcon size={15} />}
-                  <span className="font-medium text-gray-700">
-                    {noEmail ? 'Email (no address)' : 'Send via email'}
-                  </span>
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Edit */}
         {!readonly && (
           <Link
@@ -542,17 +690,12 @@ export default function InvoiceRow({
             className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
             title="Delete invoice"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-              <path d="M10 11v6M14 11v6"/>
-              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-            </svg>
+            <DeleteIcon />
           </button>
         )}
       </div>
 
-      {/* Error toast below row */}
+      {/* Error toast (shown below whichever layout is active) */}
       {actionError && (
         <div
           className="mx-4 mb-2 px-3 py-2 rounded-lg text-xs text-red-700 bg-red-50"
