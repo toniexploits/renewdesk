@@ -7,6 +7,7 @@ import type { Invoice, InvoiceStatus, Profile } from '@/lib/types'
 import { formatAmount } from '@/lib/format'
 import StatusBadge from '@/components/StatusBadge'
 import { generatePDF, invoiceToPDFData } from '@/lib/generatePDF'
+import DropdownPortal from '@/components/DropdownPortal'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -270,19 +271,7 @@ export default function InvoiceRow({
   const [toast, setToast] = useState<{ message: string; ok: boolean } | null>(null)
 
   const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  // Close on outside click
-  useEffect(() => {
-    if (!menuOpen) return
-    function handleOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleOutside)
-    return () => document.removeEventListener('mousedown', handleOutside)
-  }, [menuOpen])
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   // Close when another row opens its menu
   useEffect(() => {
@@ -591,9 +580,10 @@ export default function InvoiceRow({
             </span>
 
             {!readonly && (
-              <div className="relative" ref={menuRef}>
+              <div>
                 {/* ⋯ trigger */}
                 <button
+                  ref={triggerRef}
                   onClick={toggleMenu}
                   disabled={anyBusy}
                   className="w-9 h-9 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 transition-colors disabled:opacity-40"
@@ -609,14 +599,12 @@ export default function InvoiceRow({
                   }
                 </button>
 
-                {/* Dropdown panel */}
-                {menuOpen && (
+                <DropdownPortal isOpen={menuOpen} anchorRef={triggerRef} onClose={() => setMenuOpen(false)}>
                   <div
-                    className="absolute right-0 top-full mt-1.5 z-50 bg-white rounded-lg min-w-[200px] overflow-hidden"
+                    className="bg-white rounded-lg overflow-hidden"
                     style={{
                       border: '1px solid #e5e7eb',
                       boxShadow: '0 10px 25px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)',
-                      animation: 'dropdown-in 0.12s ease-out',
                     }}
                   >
                     {/* PDF */}
@@ -708,7 +696,7 @@ export default function InvoiceRow({
                       <span className="text-[14px] font-medium text-red-600">Delete invoice</span>
                     </button>
                   </div>
-                )}
+                </DropdownPortal>
               </div>
             )}
           </div>
