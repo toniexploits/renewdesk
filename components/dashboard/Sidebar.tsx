@@ -118,12 +118,12 @@ export default function Sidebar() {
         </nav>
       </aside>
 
-      {/* Mobile bottom nav */}
+      {/* Mobile bottom nav — excludes New Renewal (accessible via header button) */}
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 bg-white z-20 flex"
         style={{ borderTop: '1px solid rgba(0,0,0,0.10)' }}
       >
-        {navItems.map((item) => {
+        {navItems.filter((item) => item.href !== '/dashboard/new').map((item) => {
           const active = isActive(item.href, item.exact, pathname)
           return (
             <Link

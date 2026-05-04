@@ -125,7 +125,7 @@ export default function QuotesPage() {
             <StatCard label="Expired"   value={String(expired)} />
           </div>
 
-          {draftsCount > 0 && (
+          {draftsCount > 0 && activeTab !== 'draft' && (
             <button
               onClick={() => setActiveTab('draft')}
               className="w-full flex items-center gap-2 px-4 py-2.5 mb-3 rounded-xl text-sm transition-colors text-left"
