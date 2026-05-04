@@ -11,6 +11,7 @@ import { generatePDF, invoiceToPDFData } from '@/lib/generatePDF'
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CLOSE_MENUS_EVENT = 'renewdesk:close-menus'
+const DRAFT_DISABLED_TITLE = 'Complete invoice before sending'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,15 @@ function DeleteIcon({ size = 14 }: { size?: number }) {
   )
 }
 
+function DuplicateIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2"/>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+    </svg>
+  )
+}
+
 function CheckIcon({ size = 14 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -99,6 +109,7 @@ function SpinnerIcon({ size = 14, color }: { size?: number; color: string }) {
 }
 
 const STATUS_DOT_COLORS: Record<InvoiceStatus, string> = {
+  draft:     '#3b82f6',
   pending:   '#f59e0b',
   paid:      '#1D9E75',
   overdue:   '#ef4444',
@@ -107,9 +118,7 @@ const STATUS_DOT_COLORS: Record<InvoiceStatus, string> = {
 
 function StatusDot({ status }: { status: InvoiceStatus }) {
   return (
-    <span
-      className="flex-shrink-0 w-4 h-4 flex items-center justify-center"
-    >
+    <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
       <span
         style={{
           width: 8,
@@ -139,21 +148,18 @@ const ACTION_CONFIG = {
   pdf: {
     label: 'Download PDF',
     color: '#1a1a18',
-    disabledColor: '#9e9e99',
     Icon: PdfIcon,
     title: 'Download invoice PDF',
   },
   whatsapp: {
     label: 'Send via WhatsApp',
     color: '#25D366',
-    disabledColor: '#9e9e99',
     Icon: WAIcon,
     title: 'Send invoice via WhatsApp',
   },
   email: {
     label: 'Send via email',
     color: '#1D9E75',
-    disabledColor: '#9e9e99',
     Icon: EmailIcon,
     title: 'Send invoice via email',
   },
@@ -168,6 +174,7 @@ function InlineActionBtn({
   hasError,
   disabled,
   onClick,
+  titleOverride,
 }: {
   type: ActionType
   loading: boolean
@@ -175,13 +182,14 @@ function InlineActionBtn({
   hasError: boolean
   disabled: boolean
   onClick: () => void
+  titleOverride?: string
 }) {
   const cfg = ACTION_CONFIG[type]
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      title={cfg.title}
+      title={titleOverride ?? cfg.title}
       style={{ color: success ? '#1D9E75' : hasError ? '#ef4444' : cfg.color }}
       className="w-8 h-8 flex items-center justify-center rounded-md border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
     >
@@ -234,9 +242,15 @@ function DropdownItem({
   )
 }
 
+// ─── Divider ─────────────────────────────────────────────────────────────────
+
+function MenuDivider() {
+  return <div style={{ height: 1, background: '#f0ede6', margin: '4px 0' }} />
+}
+
 // ─── Status options ───────────────────────────────────────────────────────────
 
-const STATUS_OPTIONS: InvoiceStatus[] = ['pending', 'paid', 'overdue', 'cancelled']
+const STATUS_OPTIONS: InvoiceStatus[] = ['draft', 'pending', 'paid', 'overdue', 'cancelled']
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -252,6 +266,8 @@ export default function InvoiceRow({
   const [actionLoading, setActionLoading] = useState<ActionType | null>(null)
   const [actionSuccess, setActionSuccess] = useState<ActionType | null>(null)
   const [actionError, setActionError] = useState<{ type: ActionType; message: string } | null>(null)
+  const [duplicateLoading, setDuplicateLoading] = useState(false)
+  const [toast, setToast] = useState<{ message: string; ok: boolean } | null>(null)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -279,11 +295,14 @@ export default function InvoiceRow({
     if (menuOpen) {
       setMenuOpen(false)
     } else {
-      // Close every other row's menu, then open ours.
-      // React 18 batches the resulting setMenuOpen(false) + setMenuOpen(true).
       document.dispatchEvent(new CustomEvent(CLOSE_MENUS_EVENT))
       setMenuOpen(true)
     }
+  }
+
+  function showToast(message: string, ok = true) {
+    setToast({ message, ok })
+    setTimeout(() => setToast(null), 3000)
   }
 
   function markSuccess(type: ActionType) {
@@ -297,11 +316,13 @@ export default function InvoiceRow({
   }
 
   const anyLoading = actionLoading !== null
+  const anyBusy = anyLoading || duplicateLoading
+  const isDraft = invoice.status === 'draft'
 
   // ── PDF handler ──────────────────────────────────────────────────────────────
 
   async function handlePDF() {
-    if (anyLoading) return
+    if (anyBusy || isDraft) return
     setActionLoading('pdf')
     setActionError(null)
     setMenuOpen(false)
@@ -321,7 +342,7 @@ export default function InvoiceRow({
   // ── WhatsApp handler ─────────────────────────────────────────────────────────
 
   async function handleWhatsApp() {
-    if (anyLoading) return
+    if (anyBusy || isDraft) return
     setActionLoading('whatsapp')
     setActionError(null)
     setMenuOpen(false)
@@ -393,7 +414,7 @@ export default function InvoiceRow({
   // ── Email handler ────────────────────────────────────────────────────────────
 
   async function handleEmail() {
-    if (anyLoading || !invoice.client_email) return
+    if (anyBusy || isDraft || !invoice.client_email) return
     setActionLoading('email')
     setActionError(null)
     setMenuOpen(false)
@@ -444,6 +465,59 @@ export default function InvoiceRow({
     }
   }
 
+  // ── Duplicate handler ────────────────────────────────────────────────────────
+
+  async function handleDuplicate() {
+    if (anyBusy) return
+    setMenuOpen(false)
+    setDuplicateLoading(true)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const userId = session?.user?.id
+      if (!userId) { showToast('Not signed in', false); return }
+
+      const newInvNumber = `INV-${Math.floor(100000 + Math.random() * 900000)}`
+
+      let newRenewalDate: string | null = null
+      if (invoice.renewal_date) {
+        const d = new Date(invoice.renewal_date + 'T00:00:00')
+        d.setFullYear(d.getFullYear() + 1)
+        newRenewalDate = d.toISOString().split('T')[0]
+      }
+
+      const { error } = await supabase.from('invoices').insert({
+        user_id: userId,
+        inv_number: newInvNumber,
+        status: 'draft',
+        client_name: invoice.client_name,
+        client_email: invoice.client_email,
+        client_phone: invoice.client_phone,
+        contact_name: invoice.contact_name,
+        service_name: invoice.service_name,
+        service_plan: invoice.service_plan,
+        renewal_date: newRenewalDate,
+        line_items: invoice.line_items,
+        subtotal: invoice.subtotal,
+        tax_rate: invoice.tax_rate,
+        tax_amount: invoice.tax_amount,
+        total: invoice.total,
+        currency: invoice.currency,
+        notes: invoice.notes,
+      })
+
+      if (error) {
+        showToast(`Duplicate failed: ${error.message}`, false)
+      } else {
+        showToast(`Invoice duplicated as draft — ${newInvNumber}`)
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Duplicate failed', false)
+    } finally {
+      setDuplicateLoading(false)
+    }
+  }
+
   // ── Status / delete handlers ──────────────────────────────────────────────────
 
   async function handleStatusChange(newStatus: InvoiceStatus) {
@@ -486,17 +560,25 @@ export default function InvoiceRow({
           from { opacity: 0; transform: scale(0.95) translateY(-4px); }
           to   { opacity: 1; transform: scale(1)    translateY(0);    }
         }
+        @keyframes toast-in {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0);   }
+        }
       `}</style>
 
       {/* ══ MOBILE LAYOUT (below md) ══════════════════════════════════════════ */}
       <div
-        className="md:hidden px-4 py-4 hover:bg-gray-50 transition-colors"
+        className={`md:hidden px-4 py-4 transition-colors ${
+          isDraft
+            ? 'border-l-[3px] border-blue-200 hover:bg-blue-50/40'
+            : 'hover:bg-gray-50'
+        }`}
         style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}
         onClick={() => {/* stub: future invoice detail view */}}
       >
         {/* Row 1: invoice number · amount · ⋯ button */}
         <div className="flex items-start justify-between">
-          <span className="text-[12px] text-gray-400 font-medium mt-px tabular-nums">
+          <span className={`text-[12px] font-medium mt-px tabular-nums ${isDraft ? 'text-blue-400' : 'text-gray-400'}`}>
             {invoice.inv_number}
           </span>
 
@@ -513,13 +595,16 @@ export default function InvoiceRow({
                 {/* ⋯ trigger */}
                 <button
                   onClick={toggleMenu}
-                  disabled={anyLoading}
+                  disabled={anyBusy}
                   className="w-9 h-9 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 transition-colors disabled:opacity-40"
                   title="Invoice actions"
                   aria-label="Invoice actions"
                 >
-                  {anyLoading
-                    ? <SpinnerIcon color={ACTION_CONFIG[actionLoading as ActionType]?.color ?? '#9e9e99'} />
+                  {anyBusy
+                    ? <SpinnerIcon color={
+                        duplicateLoading ? '#3b82f6' :
+                        ACTION_CONFIG[actionLoading as ActionType]?.color ?? '#9e9e99'
+                      } />
                     : <DotsIcon />
                   }
                 </button>
@@ -537,11 +622,11 @@ export default function InvoiceRow({
                     {/* PDF */}
                     <DropdownItem
                       icon={<PdfIcon size={15} />}
-                      label="Download PDF"
+                      label={isDraft ? 'Download PDF (draft)' : 'Download PDF'}
                       loading={actionLoading === 'pdf'}
                       success={actionSuccess === 'pdf'}
-                      onClick={handlePDF}
-                      disabled={anyLoading}
+                      onClick={isDraft ? undefined : handlePDF}
+                      disabled={anyBusy || isDraft}
                     />
 
                     {/* WhatsApp */}
@@ -550,26 +635,51 @@ export default function InvoiceRow({
                       label="Send via WhatsApp"
                       loading={actionLoading === 'whatsapp'}
                       success={actionSuccess === 'whatsapp'}
-                      onClick={handleWhatsApp}
-                      disabled={anyLoading}
+                      onClick={isDraft ? undefined : handleWhatsApp}
+                      disabled={anyBusy || isDraft}
                       iconColor="#25D366"
                     />
 
                     {/* Email */}
                     <DropdownItem
                       icon={<EmailIcon size={15} />}
-                      label={noEmail ? 'Email (no address)' : 'Send via email'}
+                      label={isDraft ? 'Send via email (draft)' : noEmail ? 'Email (no address)' : 'Send via email'}
                       loading={actionLoading === 'email'}
                       success={actionSuccess === 'email'}
-                      onClick={noEmail ? undefined : handleEmail}
-                      disabled={anyLoading || noEmail}
+                      onClick={(isDraft || noEmail) ? undefined : handleEmail}
+                      disabled={anyBusy || isDraft || noEmail}
                       iconColor="#1D9E75"
                     />
 
-                    {/* Divider */}
-                    <div style={{ height: 1, background: '#f0ede6', margin: '4px 0' }} />
+                    <MenuDivider />
 
-                    {/* Status options — only non-current statuses */}
+                    {/* Duplicate */}
+                    <DropdownItem
+                      icon={<DuplicateIcon size={15} />}
+                      label="Duplicate"
+                      loading={duplicateLoading}
+                      onClick={handleDuplicate}
+                      disabled={anyBusy}
+                    />
+
+                    {/* Edit */}
+                    <Link
+                      href={`/dashboard/new?edit=${invoice.id}`}
+                      className="flex items-center gap-3 px-4 hover:bg-gray-50 transition-colors"
+                      style={{ minHeight: 44 }}
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-gray-400">
+                        <EditIcon size={15} />
+                      </span>
+                      <span className="text-[14px] font-medium text-gray-700">
+                        {isDraft ? 'Complete invoice' : 'Edit invoice'}
+                      </span>
+                    </Link>
+
+                    <MenuDivider />
+
+                    {/* Status options — non-current statuses */}
                     {STATUS_OPTIONS.filter((s) => s !== invoice.status).map((s) => (
                       <button
                         key={s}
@@ -584,21 +694,7 @@ export default function InvoiceRow({
                       </button>
                     ))}
 
-                    {/* Divider */}
-                    <div style={{ height: 1, background: '#f0ede6', margin: '4px 0' }} />
-
-                    {/* Edit */}
-                    <Link
-                      href={`/dashboard/new?edit=${invoice.id}`}
-                      className="flex items-center gap-3 px-4 hover:bg-gray-50 transition-colors"
-                      style={{ minHeight: 44 }}
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-gray-400">
-                        <EditIcon size={15} />
-                      </span>
-                      <span className="text-[14px] font-medium text-gray-700">Edit invoice</span>
-                    </Link>
+                    <MenuDivider />
 
                     {/* Delete */}
                     <button
@@ -643,7 +739,11 @@ export default function InvoiceRow({
 
       {/* ══ DESKTOP LAYOUT (md+) ═════════════════════════════════════════════ */}
       <div
-        className="hidden md:flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+        className={`hidden md:flex items-center gap-3 px-4 py-3 transition-colors ${
+          isDraft
+            ? 'border-l-[3px] border-blue-200 hover:bg-blue-50/40'
+            : 'hover:bg-gray-50'
+        }`}
         style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}
       >
         {/* Client info */}
@@ -685,7 +785,7 @@ export default function InvoiceRow({
           )}
         </div>
 
-        {/* Action buttons */}
+        {/* Action buttons — disabled for drafts */}
         {!readonly && (
           <div className="flex items-center gap-1 flex-shrink-0">
             <InlineActionBtn
@@ -693,34 +793,56 @@ export default function InvoiceRow({
               loading={actionLoading === 'pdf'}
               success={actionSuccess === 'pdf'}
               hasError={actionError?.type === 'pdf'}
-              disabled={anyLoading}
+              disabled={anyBusy || isDraft}
               onClick={handlePDF}
+              titleOverride={isDraft ? DRAFT_DISABLED_TITLE : undefined}
             />
             <InlineActionBtn
               type="whatsapp"
               loading={actionLoading === 'whatsapp'}
               success={actionSuccess === 'whatsapp'}
               hasError={actionError?.type === 'whatsapp'}
-              disabled={anyLoading}
+              disabled={anyBusy || isDraft}
               onClick={handleWhatsApp}
+              titleOverride={isDraft ? DRAFT_DISABLED_TITLE : undefined}
             />
             <InlineActionBtn
               type="email"
               loading={actionLoading === 'email'}
               success={actionSuccess === 'email'}
               hasError={actionError?.type === 'email'}
-              disabled={anyLoading || noEmail}
+              disabled={anyBusy || isDraft || noEmail}
               onClick={handleEmail}
+              titleOverride={isDraft ? DRAFT_DISABLED_TITLE : undefined}
             />
           </div>
         )}
 
-        {/* Edit */}
+        {/* Duplicate */}
+        {!readonly && (
+          <button
+            onClick={handleDuplicate}
+            disabled={anyBusy}
+            title="Duplicate invoice as draft"
+            className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {duplicateLoading
+              ? <SpinnerIcon size={14} color="#3b82f6" />
+              : <DuplicateIcon />
+            }
+          </button>
+        )}
+
+        {/* Edit / Complete (for drafts, label changes to "Complete") */}
         {!readonly && (
           <Link
             href={`/dashboard/new?edit=${invoice.id}`}
-            title="Edit invoice"
-            className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            title={isDraft ? 'Complete draft invoice' : 'Edit invoice'}
+            className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-md transition-colors ${
+              isDraft
+                ? 'text-blue-400 hover:text-blue-600 hover:bg-blue-50'
+                : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
+            }`}
           >
             <EditIcon />
           </Link>
@@ -748,6 +870,27 @@ export default function InvoiceRow({
             {ACTION_CONFIG[actionError.type].label} failed:
           </span>{' '}
           {actionError.message}
+        </div>
+      )}
+
+      {/* Success / error toast — bottom-right, fixed */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 right-6 z-[200] flex items-center gap-2.5 px-4 py-3 rounded-xl text-white text-sm font-medium pointer-events-none ${
+            toast.ok ? 'bg-brand' : 'bg-red-500'
+          }`}
+          style={{
+            boxShadow: toast.ok
+              ? '0 8px 24px rgba(29,158,117,0.35)'
+              : '0 8px 24px rgba(239,68,68,0.35)',
+            animation: 'toast-in 0.2s ease-out',
+          }}
+        >
+          {toast.ok
+            ? <CheckIcon size={15} />
+            : <span style={{ fontSize: 15 }}>!</span>
+          }
+          {toast.message}
         </div>
       )}
     </>

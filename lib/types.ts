@@ -24,7 +24,7 @@ export interface Profile {
   updated_at: string
 }
 
-export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled'
+export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled' | 'draft'
 
 export interface Invoice {
   id: string

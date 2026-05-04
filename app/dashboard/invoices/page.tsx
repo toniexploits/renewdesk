@@ -10,10 +10,11 @@ import InvoiceRow from '@/components/InvoiceRow'
 type FilterTab = 'all' | InvoiceStatus
 
 const TABS: { key: FilterTab; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'paid', label: 'Paid' },
-  { key: 'overdue', label: 'Overdue' },
+  { key: 'all',       label: 'All'       },
+  { key: 'draft',     label: 'Draft'     },
+  { key: 'pending',   label: 'Pending'   },
+  { key: 'paid',      label: 'Paid'      },
+  { key: 'overdue',   label: 'Overdue'   },
   { key: 'cancelled', label: 'Cancelled' },
 ]
 
@@ -48,7 +49,6 @@ export default function InvoicesPage() {
 
       const userId = user.id
 
-      // Fetch profile and invoices in parallel
       const [, profileResult] = await Promise.all([
         fetchInvoices(userId),
         supabase.from('profiles').select('*').eq('id', userId).single(),
@@ -95,13 +95,17 @@ export default function InvoicesPage() {
   const filtered = activeTab === 'all' ? invoices : invoices.filter((i) => i.status === activeTab)
 
   const currency = invoices[0]?.currency ?? 'NGN'
-  const outstanding = invoices
+
+  // Exclude drafts from financial metrics
+  const activeInvoices = invoices.filter((i) => i.status !== 'draft')
+  const outstanding = activeInvoices
     .filter((i) => i.status === 'pending' || i.status === 'overdue')
     .reduce((s, i) => s + i.total, 0)
-  const collected = invoices
+  const collected = activeInvoices
     .filter((i) => i.status === 'paid')
     .reduce((s, i) => s + i.total, 0)
-  const overdueCount = invoices.filter((i) => i.status === 'overdue').length
+  const overdueCount = activeInvoices.filter((i) => i.status === 'overdue').length
+  const draftsCount = invoices.filter((i) => i.status === 'draft').length
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
@@ -122,12 +126,34 @@ export default function InvoicesPage() {
 
       {/* Summary stats */}
       {!loading && invoices.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-          <StatCard label="Total" value={String(invoices.length)} />
-          <StatCard label="Outstanding" value={formatAmount(outstanding, currency)} />
-          <StatCard label="Collected" value={formatAmount(collected, currency)} green />
-          <StatCard label="Overdue" value={String(overdueCount)} />
-        </div>
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+            <StatCard label="Total" value={String(invoices.length)} />
+            <StatCard label="Outstanding" value={formatAmount(outstanding, currency)} />
+            <StatCard label="Collected" value={formatAmount(collected, currency)} green />
+            <StatCard label="Overdue" value={String(overdueCount)} />
+          </div>
+
+          {/* Drafts secondary metric */}
+          {draftsCount > 0 && (
+            <button
+              onClick={() => setActiveTab('draft')}
+              className="w-full flex items-center gap-2 px-4 py-2.5 mb-3 rounded-xl text-sm transition-colors text-left"
+              style={{
+                background: '#EFF6FF',
+                border: '1px solid #BFDBFE',
+              }}
+            >
+              <span
+                style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', display: 'inline-block', flexShrink: 0 }}
+              />
+              <span className="font-medium text-blue-700">
+                {draftsCount} draft {draftsCount === 1 ? 'invoice' : 'invoices'} — complete before sending
+              </span>
+              <span className="ml-auto text-blue-400 text-xs font-medium">View drafts →</span>
+            </button>
+          )}
+        </>
       )}
 
       {/* Filter tabs */}
@@ -204,7 +230,7 @@ export default function InvoicesPage() {
           </div>
         ) : (
           <div>
-            {/* Table header — desktop only (matches md+ row layout) */}
+            {/* Table header — desktop only */}
             <div
               className="hidden md:flex items-center gap-3 px-4 py-2"
               style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}

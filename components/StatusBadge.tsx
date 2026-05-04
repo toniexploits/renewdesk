@@ -1,6 +1,7 @@
 import type { InvoiceStatus } from '@/lib/types'
 
 const statusStyles: Record<InvoiceStatus, string> = {
+  draft: 'bg-[#EFF6FF] text-[#1D4ED8]',
   pending: 'bg-amber-100 text-amber-800',
   paid: 'bg-[#E1F5EE] text-[#085041]',
   overdue: 'bg-red-100 text-red-700',
@@ -8,6 +9,7 @@ const statusStyles: Record<InvoiceStatus, string> = {
 }
 
 const statusLabels: Record<InvoiceStatus, string> = {
+  draft: 'Draft',
   pending: 'Pending',
   paid: 'Paid',
   overdue: 'Overdue',

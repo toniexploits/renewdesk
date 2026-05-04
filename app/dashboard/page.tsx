@@ -27,13 +27,15 @@ export default async function DashboardPage() {
   const displayName = profile?.full_name || user!.email?.split('@')[0] || 'User'
 
   const totalCount = allInvoices.length
-  const outstanding = allInvoices
+  const activeInvoices = allInvoices.filter((i) => i.status !== 'draft')
+  const outstanding = activeInvoices
     .filter((i) => i.status === 'pending' || i.status === 'overdue')
     .reduce((s, i) => s + i.total, 0)
-  const collected = allInvoices
+  const collected = activeInvoices
     .filter((i) => i.status === 'paid')
     .reduce((s, i) => s + i.total, 0)
-  const overdueCount = allInvoices.filter((i) => i.status === 'overdue').length
+  const overdueCount = activeInvoices.filter((i) => i.status === 'overdue').length
+  const draftsCount = allInvoices.filter((i) => i.status === 'draft').length
 
   const recent = allInvoices.slice(0, 5)
 
@@ -75,6 +77,21 @@ export default async function DashboardPage() {
         />
         <MetricCard label="Overdue" value={overdueCount} sub="Need attention" />
       </div>
+
+      {/* Drafts call-out */}
+      {draftsCount > 0 && (
+        <Link
+          href="/dashboard/invoices"
+          className="flex items-center gap-2 px-4 py-2.5 mb-6 rounded-xl text-sm transition-opacity hover:opacity-80"
+          style={{ background: '#EFF6FF', border: '1px solid #BFDBFE' }}
+        >
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', display: 'inline-block', flexShrink: 0 }} />
+          <span className="font-medium text-blue-700">
+            {draftsCount} draft {draftsCount === 1 ? 'invoice' : 'invoices'} — complete before sending
+          </span>
+          <span className="ml-auto text-blue-400 text-xs font-medium">View →</span>
+        </Link>
+      )}
 
       {/* Recent invoices */}
       <div
