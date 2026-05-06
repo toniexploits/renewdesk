@@ -44,9 +44,12 @@ export interface InvoicePDFData {
   bankCountry?: string
   swiftCode?: string
   iban?: string
-  /** When 'paid': heading becomes "Receipt", total label becomes "Amount paid",
+  /** When 'paid': heading becomes "Receipt", total label becomes "Total paid",
    *  badge turns green. Omit or leave undefined for normal invoice rendering. */
   status?: string
+  /** ISO timestamp for when the invoice was paid. Used as the "Payment date"
+   *  on receipts. Falls back to updated_at when null. */
+  paymentDate?: string
 }
 
 // ─── Generator ────────────────────────────────────────────────────────────────
@@ -60,20 +63,31 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
 
   const isPaid = data.status === 'paid'
   const heading = isPaid ? 'Receipt' : 'Invoice'
-  const totalLabel = isPaid ? 'Amount paid' : 'Total due'
+  const numberLabel = isPaid ? 'Receipt No.' : 'Invoice No.'
+  const totalLabel = isPaid ? 'Total paid' : 'Total due'
+  const dateLabel = isPaid ? 'Payment date' : 'Due'
 
   const today = new Date().toLocaleDateString('en-GB', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
   })
-  const dueDate = data.renewalDate
-    ? new Date(data.renewalDate + 'T00:00:00').toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      })
-    : 'Upon renewal'
+
+  let bottomDateText: string
+  if (isPaid) {
+    const paid = data.paymentDate ? new Date(data.paymentDate) : null
+    bottomDateText = paid
+      ? paid.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+      : today
+  } else {
+    bottomDateText = data.renewalDate
+      ? new Date(data.renewalDate + 'T00:00:00').toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        })
+      : 'Upon renewal'
+  }
 
   let y = margin
 
@@ -101,9 +115,9 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
   doc.setFontSize(9)
   doc.setTextColor(107, 107, 103)
   if (data.bizEmail) doc.text(data.bizEmail, rightEdge, y + 12, { align: 'right' })
-  doc.text(data.invNumber, rightEdge, y + 19, { align: 'right' })
+  doc.text(`${numberLabel} ${data.invNumber}`, rightEdge, y + 19, { align: 'right' })
   doc.text(`Issued: ${today}`, rightEdge, y + 25, { align: 'right' })
-  doc.text(`Due: ${dueDate}`, rightEdge, y + 31, { align: 'right' })
+  doc.text(`${dateLabel}: ${bottomDateText}`, rightEdge, y + 31, { align: 'right' })
 
   // Status badge
   const badgeY = y + 39
@@ -113,7 +127,7 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(8)
     doc.setTextColor(8, 80, 65)       // #085041
-    doc.text('Payment received', rightEdge - 28, badgeY + 0.5, { align: 'center' })
+    doc.text('Payment Received', rightEdge - 28, badgeY + 0.5, { align: 'center' })
   } else {
     doc.setFillColor(254, 243, 199)   // #FEF3C7
     doc.roundedRect(rightEdge - 52, badgeY - 4, 52, 7, 1.5, 1.5, 'F')
@@ -281,7 +295,7 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(158, 158, 153)
-  doc.text('Generated with RenewDesk', margin, 282)
+  doc.text(isPaid ? 'Thank you for your payment.' : 'Generated with RenewDesk', margin, 282)
 
   return doc
 }
@@ -289,6 +303,7 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
 // ─── Convenience: build InvoicePDFData from a saved Invoice + Profile ────────
 
 export function invoiceToPDFData(invoice: Invoice, profile: Profile | null): InvoicePDFData {
+  const inv = invoice as Invoice & { payment_date?: string | null }
   return {
     invNumber: invoice.inv_number,
     bizName: profile?.business_name ?? '',
@@ -318,5 +333,6 @@ export function invoiceToPDFData(invoice: Invoice, profile: Profile | null): Inv
     swiftCode: profile?.swift_code ?? undefined,
     iban: profile?.iban ?? undefined,
     status: invoice.status,
+    paymentDate: inv.payment_date ?? invoice.updated_at ?? undefined,
   }
 }

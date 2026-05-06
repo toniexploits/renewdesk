@@ -188,13 +188,28 @@ interface PreviewProps {
   subtotal: number
   taxAmount: number
   grand: number
+  status?: string
+  paymentDate?: string | null
 }
 
-function InvoicePreview({ form, items, invNumber, subtotal, taxAmount, grand }: PreviewProps) {
+function InvoicePreview({ form, items, invNumber, subtotal, taxAmount, grand, status, paymentDate }: PreviewProps) {
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-  const dueDate = form.renewalDate
-    ? new Date(form.renewalDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-    : 'Upon renewal'
+  const isPaid = status === 'paid'
+  const heading = isPaid ? 'Receipt' : 'Invoice'
+  const numberLabel = isPaid ? 'Receipt No.' : 'Invoice No.'
+  const dateLabel = isPaid ? 'Payment date' : 'Due'
+
+  let bottomDateText: string
+  if (isPaid) {
+    const paid = paymentDate ? new Date(paymentDate) : null
+    bottomDateText = paid
+      ? paid.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+      : today
+  } else {
+    bottomDateText = form.renewalDate
+      ? new Date(form.renewalDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+      : 'Upon renewal'
+  }
 
   const currency = form.currency
   const hasBankDetails = form.bankName || form.accountName || form.accountNumber
@@ -202,10 +217,10 @@ function InvoicePreview({ form, items, invNumber, subtotal, taxAmount, grand }: 
   return (
     <div className="bg-white rounded-xl overflow-hidden" style={{ border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)' }}>
       <div className="p-4">
-        {/* Top: Invoice heading + meta */}
+        {/* Top: heading + meta */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
           <div>
-            <h2 className="text-2xl font-bold text-brand" style={{ fontFamily: 'Georgia, serif' }}>Invoice</h2>
+            <h2 className="text-2xl font-bold text-brand" style={{ fontFamily: 'Georgia, serif' }}>{heading}</h2>
             <p className="text-xs text-gray-400 mt-1">
               {form.serviceName || 'Service'}
               {form.servicePlan ? ` — ${form.servicePlan}` : ''}
@@ -214,11 +229,15 @@ function InvoicePreview({ form, items, invNumber, subtotal, taxAmount, grand }: 
           <div className="text-xs text-gray-400 leading-7 sm:text-right">
             <p className="text-sm font-semibold text-gray-900">{form.bizName || 'Your Business'}</p>
             <p>{form.bizEmail}</p>
-            <p className="mt-1">{invNumber}</p>
+            <p className="mt-1">{numberLabel} {invNumber}</p>
             <p>Issued: {today}</p>
-            <p>Due: {dueDate}</p>
+            <p>{dateLabel}: {bottomDateText}</p>
             <div className="mt-1">
-              <span className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800">Draft</span>
+              {isPaid ? (
+                <span className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#E1F5EE] text-[#085041]">Payment Received</span>
+              ) : (
+                <span className="inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800">Draft</span>
+              )}
             </div>
           </div>
         </div>
@@ -283,7 +302,7 @@ function InvoicePreview({ form, items, invNumber, subtotal, taxAmount, grand }: 
             className="flex justify-between text-sm font-semibold text-gray-900 py-2 mt-1"
             style={{ borderTop: '1.5px solid rgba(0,0,0,0.13)' }}
           >
-            <span>Total due</span>
+            <span>{isPaid ? 'Total paid' : 'Total due'}</span>
             <span>{formatAmount(grand, currency)}</span>
           </div>
         </div>
@@ -873,6 +892,8 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
             subtotal={subtotal}
             taxAmount={taxAmount}
             grand={grand}
+            status={invoice?.status}
+            paymentDate={(invoice as (Invoice & { payment_date?: string | null }) | null | undefined)?.payment_date ?? invoice?.updated_at ?? null}
           />
 
           {/* Action card */}

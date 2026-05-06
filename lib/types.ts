@@ -45,6 +45,7 @@ export interface Invoice {
   currency: string | null
   status: InvoiceStatus
   notes: string | null
+  payment_date: string | null
   created_at: string
   updated_at: string
 }

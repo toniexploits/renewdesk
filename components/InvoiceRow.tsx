@@ -148,21 +148,27 @@ function DotsIcon() {
 const ACTION_CONFIG = {
   pdf: {
     label: 'Download PDF',
+    paidLabel: 'Download Receipt',
     color: '#1a1a18',
     Icon: PdfIcon,
     title: 'Download invoice PDF',
+    paidTitle: 'Download receipt PDF',
   },
   whatsapp: {
     label: 'Send via WhatsApp',
+    paidLabel: 'Send Receipt via WhatsApp',
     color: '#25D366',
     Icon: WAIcon,
     title: 'Send invoice via WhatsApp',
+    paidTitle: 'Send receipt via WhatsApp',
   },
   email: {
     label: 'Send via email',
+    paidLabel: 'Send Receipt via email',
     color: '#1D9E75',
     Icon: EmailIcon,
     title: 'Send invoice via email',
+    paidTitle: 'Send receipt via email',
   },
 } as const
 
@@ -273,6 +279,13 @@ export default function InvoiceRow({
   const [menuOpen, setMenuOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
+  // Confirmation modal for "Mark as paid" → receipt conversion
+  const [showPaidConfirm, setShowPaidConfirm] = useState(false)
+  const [paidConfirmLoading, setPaidConfirmLoading] = useState(false)
+
+  // Persistent toast shown after marking paid, with quick actions
+  const [paidActionToast, setPaidActionToast] = useState(false)
+
   // Close when another row opens its menu
   useEffect(() => {
     function handleCloseMenus() { setMenuOpen(false) }
@@ -307,6 +320,7 @@ export default function InvoiceRow({
   const anyLoading = actionLoading !== null
   const anyBusy = anyLoading || duplicateLoading
   const isDraft = invoice.status === 'draft'
+  const isPaid = invoice.status === 'paid'
 
   // ── PDF handler ──────────────────────────────────────────────────────────────
 
@@ -373,26 +387,53 @@ export default function InvoiceRow({
     const svc = invoice.service_name || 'your service'
     const plan = invoice.service_plan ? ` (${invoice.service_plan})` : ''
 
-    const msg = [
-      `Hello ${invoice.client_name || 'there'},`,
-      ``,
-      `This is a renewal reminder from *${biz}*.`,
-      ``,
-      `Your *${svc}${plan}* is due for renewal${dueFmt ? ` on *${dueFmt}*` : ''}.`,
-      ``,
-      `Invoice: ${invoice.inv_number}`,
-      `Total: *${formatAmount(invoice.total, currency)}*`,
-      ``,
-      invoice.notes ? `${invoice.notes}\n` : '',
-      `Please reach out to confirm or arrange payment. Thank you!`,
-      ``,
-      pdfUrl ? `📎 Invoice PDF: ${pdfUrl}` : '',
-      ``,
-      `— ${biz}`,
-    ]
-      .join('\n')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim()
+    const invForPaid = invoice as Invoice & { payment_date?: string | null }
+    const paidDateSource = invForPaid.payment_date ?? invoice.updated_at
+    const paidDateFmt = paidDateSource
+      ? new Date(paidDateSource).toLocaleDateString('en-GB', {
+          day: '2-digit', month: 'short', year: 'numeric',
+        })
+      : ''
+
+    const msg = isPaid
+      ? [
+          `Hello ${invoice.client_name || 'there'},`,
+          ``,
+          `Please find your payment receipt from *${biz}*.`,
+          ``,
+          `🧾 *Receipt: ${invoice.inv_number}*`,
+          `✅ Payment received: *${formatAmount(invoice.total, currency)}*`,
+          paidDateFmt ? `📅 Payment date: *${paidDateFmt}*` : '',
+          ``,
+          `Thank you for your payment. It's a pleasure doing business with you!`,
+          ``,
+          pdfUrl ? `📎 Receipt PDF: ${pdfUrl}` : '',
+          ``,
+          `— ${biz}`,
+        ]
+          .join('\n')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim()
+      : [
+          `Hello ${invoice.client_name || 'there'},`,
+          ``,
+          `This is a renewal reminder from *${biz}*.`,
+          ``,
+          `Your *${svc}${plan}* is due for renewal${dueFmt ? ` on *${dueFmt}*` : ''}.`,
+          ``,
+          `Invoice: ${invoice.inv_number}`,
+          `Total: *${formatAmount(invoice.total, currency)}*`,
+          ``,
+          invoice.notes ? `${invoice.notes}\n` : '',
+          `Please reach out to confirm or arrange payment. Thank you!`,
+          ``,
+          pdfUrl ? `📎 Invoice PDF: ${pdfUrl}` : '',
+          ``,
+          `— ${biz}`,
+        ]
+          .join('\n')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim()
 
     const base = phone ? `https://wa.me/${phone}` : 'https://wa.me/'
     window.open(`${base}?text=${encodeURIComponent(msg)}`, '_blank')
@@ -413,10 +454,12 @@ export default function InvoiceRow({
       const doc = generatePDF(pdfData)
       const pdfBase64 = doc.output('datauristring').split(',')[1]
 
+      const invForEmail = invoice as Invoice & { payment_date?: string | null }
       const res = await fetch('/api/send-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          isReceipt: isPaid,
           invoiceData: {
             invNumber: invoice.inv_number,
             clientName: invoice.client_name,
@@ -425,6 +468,7 @@ export default function InvoiceRow({
             serviceName: invoice.service_name ?? '',
             servicePlan: invoice.service_plan ?? '',
             renewalDate: invoice.renewal_date ?? '',
+            paymentDate: invForEmail.payment_date ?? invoice.updated_at ?? '',
             currency: invoice.currency ?? 'NGN',
             taxRate: invoice.tax_rate,
             items: Array.isArray(invoice.line_items) ? invoice.line_items : [],
@@ -510,11 +554,34 @@ export default function InvoiceRow({
   // ── Status / delete handlers ──────────────────────────────────────────────────
 
   async function handleStatusChange(newStatus: InvoiceStatus) {
+    if (newStatus === 'paid' && invoice.status !== 'paid') {
+      setShowPaidConfirm(true)
+      return
+    }
     const { error } = await supabase
       .from('invoices')
       .update({ status: newStatus, updated_at: new Date().toISOString() })
       .eq('id', invoice.id)
     if (!error && onStatusChange) onStatusChange(invoice.id, newStatus)
+  }
+
+  async function confirmMarkAsPaid() {
+    setPaidConfirmLoading(true)
+    const nowIso = new Date().toISOString()
+    const { error } = await supabase
+      .from('invoices')
+      .update({ status: 'paid', payment_date: nowIso, updated_at: nowIso })
+      .eq('id', invoice.id)
+    setPaidConfirmLoading(false)
+    if (!error) {
+      // Optimistic update — parent re-renders the row as paid immediately
+      if (onStatusChange) onStatusChange(invoice.id, 'paid')
+      setShowPaidConfirm(false)
+      setPaidActionToast(true)
+    } else {
+      showToast(`Mark as paid failed: ${error.message}`, false)
+      setShowPaidConfirm(false)
+    }
   }
 
   async function handleDelete() {
@@ -525,13 +592,26 @@ export default function InvoiceRow({
 
   // ── Derived values ────────────────────────────────────────────────────────────
 
-  const renewalDate = invoice.renewal_date
+  const invWithPayment = invoice as Invoice & { payment_date?: string | null }
+  const paidDateSource = isPaid ? (invWithPayment.payment_date ?? invoice.updated_at) : null
+
+  const renewalDate = isPaid
+    ? paidDateSource
+      ? new Date(paidDateSource).toLocaleDateString('en-GB', {
+          day: '2-digit', month: 'short', year: 'numeric',
+        })
+      : '—'
+    : invoice.renewal_date
     ? new Date(invoice.renewal_date + 'T00:00:00').toLocaleDateString('en-GB', {
         day: '2-digit', month: 'short', year: 'numeric',
       })
     : '—'
 
-  const renewalDateShort = invoice.renewal_date
+  const renewalDateShort = isPaid
+    ? paidDateSource
+      ? new Date(paidDateSource).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+      : null
+    : invoice.renewal_date
     ? new Date(invoice.renewal_date + 'T00:00:00').toLocaleDateString('en-GB', {
         day: 'numeric', month: 'short',
       })
@@ -567,9 +647,14 @@ export default function InvoiceRow({
       >
         {/* Row 1: invoice number · amount · ⋯ button */}
         <div className="flex items-start justify-between">
-          <span className={`text-[12px] font-medium mt-px tabular-nums ${isDraft ? 'text-blue-400' : 'text-gray-400'}`}>
-            {invoice.inv_number}
-          </span>
+          <div className="flex flex-col">
+            <span className={`text-[12px] font-medium mt-px tabular-nums ${isDraft ? 'text-blue-400' : 'text-gray-400'}`}>
+              {invoice.inv_number}
+            </span>
+            {isPaid && (
+              <span className="text-[10px] font-medium text-gray-400 leading-tight">Receipt</span>
+            )}
+          </div>
 
           <div
             className="flex items-center gap-1.5"
@@ -610,7 +695,7 @@ export default function InvoiceRow({
                     {/* PDF */}
                     <DropdownItem
                       icon={<PdfIcon size={15} />}
-                      label={isDraft ? 'Download PDF (draft)' : 'Download PDF'}
+                      label={isDraft ? 'Download PDF (draft)' : isPaid ? 'Download Receipt' : 'Download PDF'}
                       loading={actionLoading === 'pdf'}
                       success={actionSuccess === 'pdf'}
                       onClick={isDraft ? undefined : handlePDF}
@@ -620,7 +705,7 @@ export default function InvoiceRow({
                     {/* WhatsApp */}
                     <DropdownItem
                       icon={<WAIcon size={15} />}
-                      label="Send via WhatsApp"
+                      label={isPaid ? 'Send Receipt via WhatsApp' : 'Send via WhatsApp'}
                       loading={actionLoading === 'whatsapp'}
                       success={actionSuccess === 'whatsapp'}
                       onClick={isDraft ? undefined : handleWhatsApp}
@@ -631,7 +716,15 @@ export default function InvoiceRow({
                     {/* Email */}
                     <DropdownItem
                       icon={<EmailIcon size={15} />}
-                      label={isDraft ? 'Send via email (draft)' : noEmail ? 'Email (no address)' : 'Send via email'}
+                      label={
+                        isDraft
+                          ? 'Send via email (draft)'
+                          : noEmail
+                          ? 'Email (no address)'
+                          : isPaid
+                          ? 'Send Receipt via email'
+                          : 'Send via email'
+                      }
                       loading={actionLoading === 'email'}
                       success={actionSuccess === 'email'}
                       onClick={(isDraft || noEmail) ? undefined : handleEmail}
@@ -712,12 +805,12 @@ export default function InvoiceRow({
           </div>
         </div>
 
-        {/* Row 3: service · due date */}
+        {/* Row 3: service · due/paid date */}
         {(invoice.service_name || renewalDateShort) && (
           <p className="text-[12px] text-gray-400 mt-0.5 leading-relaxed">
             {[
               invoice.service_name,
-              renewalDateShort ? `Due ${renewalDateShort}` : null,
+              renewalDateShort ? `${isPaid ? 'Paid' : 'Due'} ${renewalDateShort}` : null,
             ]
               .filter(Boolean)
               .join(' · ')}
@@ -739,6 +832,7 @@ export default function InvoiceRow({
           <p className="font-semibold text-gray-900 text-sm truncate">{invoice.client_name}</p>
           <p className="text-xs text-gray-400 mt-0.5 truncate">
             {[invoice.service_name, invoice.inv_number].filter(Boolean).join(' · ')}
+            {isPaid && <span className="ml-1.5 text-[10px] text-gray-400">· Receipt</span>}
           </p>
         </div>
 
@@ -783,7 +877,7 @@ export default function InvoiceRow({
               hasError={actionError?.type === 'pdf'}
               disabled={anyBusy || isDraft}
               onClick={handlePDF}
-              titleOverride={isDraft ? DRAFT_DISABLED_TITLE : undefined}
+              titleOverride={isDraft ? DRAFT_DISABLED_TITLE : isPaid ? ACTION_CONFIG.pdf.paidTitle : undefined}
             />
             <InlineActionBtn
               type="whatsapp"
@@ -792,7 +886,7 @@ export default function InvoiceRow({
               hasError={actionError?.type === 'whatsapp'}
               disabled={anyBusy || isDraft}
               onClick={handleWhatsApp}
-              titleOverride={isDraft ? DRAFT_DISABLED_TITLE : undefined}
+              titleOverride={isDraft ? DRAFT_DISABLED_TITLE : isPaid ? ACTION_CONFIG.whatsapp.paidTitle : undefined}
             />
             <InlineActionBtn
               type="email"
@@ -801,7 +895,7 @@ export default function InvoiceRow({
               hasError={actionError?.type === 'email'}
               disabled={anyBusy || isDraft || noEmail}
               onClick={handleEmail}
-              titleOverride={isDraft ? DRAFT_DISABLED_TITLE : undefined}
+              titleOverride={isDraft ? DRAFT_DISABLED_TITLE : isPaid ? ACTION_CONFIG.email.paidTitle : undefined}
             />
           </div>
         )}
@@ -879,6 +973,110 @@ export default function InvoiceRow({
             : <span style={{ fontSize: 15 }}>!</span>
           }
           {toast.message}
+        </div>
+      )}
+
+      {/* Mark-as-paid confirmation modal */}
+      {showPaidConfirm && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center px-4"
+          style={{ background: 'rgba(0,0,0,0.4)' }}
+          onClick={() => !paidConfirmLoading && setShowPaidConfirm(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl p-5 w-full max-w-sm"
+            style={{
+              border: '1px solid rgba(0,0,0,0.08)',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.18)',
+            }}
+          >
+            <div className="flex items-start gap-3 mb-3">
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ background: '#E1F5EE' }}
+              >
+                <span style={{ color: '#085041' }}>
+                  <CheckIcon size={18} />
+                </span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Mark as paid?</p>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  This will convert the invoice to a receipt.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setShowPaidConfirm(false)}
+                disabled={paidConfirmLoading}
+                className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-black/10 rounded-lg hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmMarkAsPaid}
+                disabled={paidConfirmLoading}
+                className="flex-1 px-3 py-2 text-sm font-medium text-white bg-brand rounded-lg hover:bg-brand-dark disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {paidConfirmLoading && <SpinnerIcon size={13} color="#fff" />}
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Persistent action toast after marking paid */}
+      {paidActionToast && (
+        <div
+          className="fixed bottom-6 right-6 z-[210] bg-white rounded-xl px-4 py-3 max-w-sm"
+          style={{
+            border: '1px solid rgba(0,0,0,0.08)',
+            boxShadow: '0 12px 32px rgba(0,0,0,0.14)',
+            animation: 'toast-in 0.2s ease-out',
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: '#E1F5EE', color: '#085041' }}
+            >
+              <CheckIcon size={14} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900">
+                Invoice marked as paid — receipt ready to send
+              </p>
+              <div className="flex gap-2 mt-2.5">
+                <button
+                  onClick={() => { setPaidActionToast(false); handlePDF() }}
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-[#1a1a18] rounded-md hover:bg-[#2a2a26] flex items-center gap-1.5"
+                >
+                  <PdfIcon size={12} />
+                  Download Receipt
+                </button>
+                <button
+                  onClick={() => {
+                    setPaidActionToast(false)
+                    if (invoice.client_email) handleEmail()
+                    else handleWhatsApp()
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-brand rounded-md hover:bg-brand-dark flex items-center gap-1.5"
+                >
+                  Send to client
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={() => setPaidActionToast(false)}
+              className="text-gray-300 hover:text-gray-500 text-base leading-none"
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
         </div>
       )}
     </>
