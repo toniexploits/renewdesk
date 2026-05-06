@@ -229,10 +229,13 @@ export function generateQuotePDF(data: QuotePDFData): jsPDF {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(158, 158, 153)
-  if (data.validUntil) {
-    doc.text(`This quote is valid until ${validUntilFmt}.`, margin, 277)
-  }
-  doc.text('Generated with RenewDesk', margin, 282)
+  doc.text(
+    data.validUntil
+      ? `Generated with RenewDesk by Barastreams · This quote is valid until ${validUntilFmt}.`
+      : 'Generated with RenewDesk by Barastreams',
+    margin,
+    282
+  )
 
   return doc
 }

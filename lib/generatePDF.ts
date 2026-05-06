@@ -295,7 +295,13 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(158, 158, 153)
-  doc.text(isPaid ? 'Thank you for your payment.' : 'Generated with RenewDesk', margin, 282)
+  doc.text(
+    isPaid
+      ? 'Generated with RenewDesk by Barastreams · Thank you for your payment.'
+      : 'Generated with RenewDesk by Barastreams · Thank you for your business.',
+    margin,
+    282
+  )
 
   return doc
 }
