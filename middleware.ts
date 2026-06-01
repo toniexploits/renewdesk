@@ -25,26 +25,39 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session — must call getUser() not getSession()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
-  const isAuthRoute = pathname === '/login' || pathname === '/signup'
+  const isAuthRoute  = pathname === '/login' || pathname === '/signup'
+  const isAdminRoute = pathname.startsWith('/rd-admin')
 
-  // Redirect authenticated users away from auth pages
   if (isAuthRoute && user) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
   }
 
-  // Redirect unauthenticated users to login
   if (!isAuthRoute && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
+  }
+
+  // Admin route guard — silently redirect non-admins to /dashboard
+  if (isAdminRoute && user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.role || !['admin', 'super_admin'].includes(profile.role)) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse

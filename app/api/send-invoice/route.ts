@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { formatAmount } from '@/lib/format'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 interface InvoiceLineItem {
   desc: string
   qty: number
@@ -472,6 +470,7 @@ export async function POST(req: NextRequest) {
     }
     const filename = `${invoiceData.invNumber}-${invoiceData.clientName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
 
+    const resend = new Resend(process.env.RESEND_API_KEY)
     const { data, error } = await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'invoices@resend.dev',
       to: [recipientEmail],

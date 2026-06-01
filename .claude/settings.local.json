@@ -6,7 +6,11 @@
       "Bash(npm run:*)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\USER\\\\renewdesk\" -Force)",
       "Bash(Select-Object Name, PSIsContainer)",
-      "Bash(Format-Table -AutoSize)"
+      "Bash(Format-Table -AutoSize)",
+      "Bash(npm install *)",
+      "Bash(node -e \"require\\('./node_modules/recharts/package.json'\\).version\")",
+      "Bash(node *)",
+      "Bash(npx next *)"
     ]
   }
 }
