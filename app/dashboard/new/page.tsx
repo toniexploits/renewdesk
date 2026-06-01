@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import NewRenewalForm from './NewRenewalForm'
-import type { Profile, Invoice } from '@/lib/types'
+import type { Profile, Invoice, BankAccount } from '@/lib/types'
 
 export default async function NewRenewalPage({
   searchParams,
@@ -10,11 +10,17 @@ export default async function NewRenewalPage({
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: profile }, { data: invoice }] = await Promise.all([
+  const [{ data: profile }, { data: invoice }, { data: bankAccounts }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user!.id).single(),
     searchParams.edit
       ? supabase.from('invoices').select('*').eq('id', searchParams.edit).eq('user_id', user!.id).single()
       : Promise.resolve({ data: null }),
+    supabase
+      .from('bank_accounts')
+      .select('*')
+      .eq('user_id', user!.id)
+      .order('is_default', { ascending: false })
+      .order('created_at', { ascending: true }),
   ])
 
   const isEditing = !!invoice
@@ -31,7 +37,11 @@ export default async function NewRenewalPage({
             : 'Create a renewal invoice and send it to your client.'}
         </p>
       </div>
-      <NewRenewalForm profile={profile as Profile | null} invoice={invoice as Invoice | null} />
+      <NewRenewalForm
+        profile={profile as Profile | null}
+        invoice={invoice as Invoice | null}
+        bankAccounts={(bankAccounts as BankAccount[] | null) ?? []}
+      />
     </div>
   )
 }

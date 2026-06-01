@@ -4,7 +4,12 @@ import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatAmount, CURRENCY_OPTIONS } from '@/lib/format'
 import { generateQuotePDF } from '@/lib/generateQuotePDF'
-import type { Profile, Quote, LineItem } from '@/lib/types'
+import type { Profile, Quote, LineItem, BankAccount, BankDetailsSnapshot } from '@/lib/types'
+import BankAccountSelector, {
+  EMPTY_CUSTOM,
+  buildBankSnapshot,
+  type CustomBankFields,
+} from '@/components/BankAccountSelector'
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -264,9 +269,10 @@ interface FormData {
 interface Props {
   profile: Profile | null
   quote?: Quote | null
+  bankAccounts: BankAccount[]
 }
 
-export default function NewQuoteForm({ profile, quote }: Props) {
+export default function NewQuoteForm({ profile, quote, bankAccounts }: Props) {
   const [step, setStep]         = useState<1 | 2 | 3>(1)
   const [saving, setSaving]     = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -297,6 +303,36 @@ export default function NewQuoteForm({ profile, quote }: Props) {
     taxRate:  quote?.tax_rate ?? profile?.tax_rate  ?? 7.5,
   })
 
+  // Bank account selection — default to quote's saved account, else default account
+  const initialAccountId =
+    quote?.bank_account_id ??
+    bankAccounts.find((a) => a.is_default)?.id ??
+    bankAccounts[0]?.id ??
+    null
+  const [selectedBankId, setSelectedBankId] = useState<string | null>(initialAccountId)
+
+  const isExistingCustom = !!quote?.bank_details_snapshot && quote.bank_account_id === null
+  const [useCustomBank, setUseCustomBank] = useState<boolean>(isExistingCustom)
+  const [customBank, setCustomBank] = useState<CustomBankFields>(() => {
+    if (isExistingCustom && quote?.bank_details_snapshot) {
+      const s = quote.bank_details_snapshot
+      return {
+        bank_name: s.bank_name,
+        account_name: s.account_name,
+        account_number: s.account_number,
+        bank_country: s.bank_country,
+        swift_code: s.swift_code ?? '',
+        iban: s.iban ?? '',
+      }
+    }
+    return EMPTY_CUSTOM
+  })
+
+  function currentSnapshot(): BankDetailsSnapshot | null {
+    const selected = bankAccounts.find((a) => a.id === selectedBankId) ?? null
+    return buildBankSnapshot(selected, useCustomBank, customBank, form.currency)
+  }
+
   const [items, setItems] = useState<LineItem[]>(
     Array.isArray(quote?.line_items) ? quote!.line_items : []
   )
@@ -316,6 +352,7 @@ export default function NewQuoteForm({ profile, quote }: Props) {
   }
 
   function getPDFData() {
+    const snap = currentSnapshot()
     return {
       quoteNumber,
       bizName:    form.bizName,
@@ -332,6 +369,12 @@ export default function NewQuoteForm({ profile, quote }: Props) {
       subtotal,
       taxAmount,
       grand,
+      bankName: snap?.bank_name || undefined,
+      accountName: snap?.account_name || undefined,
+      accountNumber: snap?.account_number || undefined,
+      bankCountry: snap?.bank_country || undefined,
+      swiftCode: snap?.swift_code || undefined,
+      iban: snap?.iban || undefined,
     }
   }
 
@@ -364,6 +407,7 @@ export default function NewQuoteForm({ profile, quote }: Props) {
       const user = session?.user
       if (!user) { setSaveError('Not authenticated. Please refresh and try again.'); return }
 
+      const snap = currentSnapshot()
       const payload = {
         user_id:      user.id,
         quote_number: quoteNumber,
@@ -382,6 +426,8 @@ export default function NewQuoteForm({ profile, quote }: Props) {
         total:        grand,
         currency:     form.currency,
         notes:        form.clientNotes || null,
+        bank_account_id: useCustomBank ? null : (selectedBankId || null),
+        bank_details_snapshot: snap,
         updated_at:   new Date().toISOString(),
       }
 
@@ -423,6 +469,9 @@ export default function NewQuoteForm({ profile, quote }: Props) {
       currency: profile?.currency ?? 'NGN',
       taxRate:  profile?.tax_rate  ?? 7.5,
     })
+    setSelectedBankId(bankAccounts.find((a) => a.is_default)?.id ?? bankAccounts[0]?.id ?? null)
+    setUseCustomBank(false)
+    setCustomBank(EMPTY_CUSTOM)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -508,6 +557,7 @@ export default function NewQuoteForm({ profile, quote }: Props) {
       const doc = generateQuotePDF(getPDFData())
       const pdfBase64 = doc.output('datauristring').split(',')[1]
 
+      const snap = currentSnapshot()
       const res = await fetch('/api/send-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -527,6 +577,11 @@ export default function NewQuoteForm({ profile, quote }: Props) {
             subtotal,
             taxAmount,
             grand,
+            bankName: snap?.bank_name ?? '',
+            accountName: snap?.account_name ?? '',
+            accountNumber: snap?.account_number ?? '',
+            swiftCode: snap?.swift_code ?? '',
+            iban: snap?.iban ?? '',
           },
           recipientEmail: form.clientEmail,
           pdfBase64,
@@ -624,6 +679,19 @@ export default function NewQuoteForm({ profile, quote }: Props) {
                 <input className={INPUT} type="number" min={0} step={0.5} value={form.taxRate} onChange={(e) => setField('taxRate', Number(e.target.value))} />
               </Field>
             </div>
+          </Card>
+
+          <Card>
+            <SectionTitle>Receiving account</SectionTitle>
+            <BankAccountSelector
+              accounts={bankAccounts}
+              selectedId={selectedBankId}
+              onSelectedChange={setSelectedBankId}
+              useCustom={useCustomBank}
+              onUseCustomChange={setUseCustomBank}
+              custom={customBank}
+              onCustomChange={setCustomBank}
+            />
           </Card>
 
           <div className="flex gap-2.5 mt-1">

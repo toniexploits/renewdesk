@@ -310,6 +310,17 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
 
 export function invoiceToPDFData(invoice: Invoice, profile: Profile | null): InvoicePDFData {
   const inv = invoice as Invoice & { payment_date?: string | null }
+  const snap = invoice.bank_details_snapshot
+
+  // Always read bank details from the snapshot when available.
+  // Fall back to profile for old invoices created before this feature.
+  const bankName = snap?.bank_name ?? profile?.bank_name ?? undefined
+  const accountName = snap?.account_name ?? profile?.account_name ?? undefined
+  const accountNumber = snap?.account_number ?? profile?.account_number ?? undefined
+  const bankCountry = snap?.bank_country ?? profile?.bank_country ?? undefined
+  const swiftCode = snap?.swift_code ?? profile?.swift_code ?? undefined
+  const iban = snap?.iban ?? profile?.iban ?? undefined
+
   return {
     invNumber: invoice.inv_number,
     bizName: profile?.business_name ?? '',
@@ -332,12 +343,12 @@ export function invoiceToPDFData(invoice: Invoice, profile: Profile | null): Inv
     subtotal: invoice.subtotal,
     taxAmount: invoice.tax_amount,
     grand: invoice.total,
-    bankName: profile?.bank_name ?? undefined,
-    accountName: profile?.account_name ?? undefined,
-    accountNumber: profile?.account_number ?? undefined,
-    bankCountry: profile?.bank_country ?? undefined,
-    swiftCode: profile?.swift_code ?? undefined,
-    iban: profile?.iban ?? undefined,
+    bankName,
+    accountName,
+    accountNumber,
+    bankCountry,
+    swiftCode,
+    iban,
     status: invoice.status,
     paymentDate: inv.payment_date ?? invoice.updated_at ?? undefined,
   }

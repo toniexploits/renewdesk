@@ -24,6 +24,32 @@ export interface Profile {
   updated_at: string
 }
 
+export interface BankAccount {
+  id: string
+  user_id: string
+  account_label: string
+  bank_name: string
+  account_name: string
+  account_number: string
+  bank_country: string
+  swift_code: string | null
+  iban: string | null
+  currency: string
+  is_default: boolean
+  created_at: string
+}
+
+export interface BankDetailsSnapshot {
+  account_label: string | null
+  bank_name: string
+  account_name: string
+  account_number: string
+  bank_country: string
+  swift_code: string | null
+  iban: string | null
+  currency: string
+}
+
 export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled' | 'draft'
 
 export interface Invoice {
@@ -46,6 +72,8 @@ export interface Invoice {
   status: InvoiceStatus
   notes: string | null
   payment_date: string | null
+  bank_account_id: string | null
+  bank_details_snapshot: BankDetailsSnapshot | null
   created_at: string
   updated_at: string
 }
@@ -73,6 +101,8 @@ export interface Quote {
   notes: string | null
   status: QuoteStatus
   converted_invoice_id: string | null
+  bank_account_id: string | null
+  bank_details_snapshot: BankDetailsSnapshot | null
   created_at: string
   updated_at: string
 }

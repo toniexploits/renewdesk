@@ -4,7 +4,12 @@ import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatAmount, CURRENCY_OPTIONS } from '@/lib/format'
 import { generatePDF } from '@/lib/generatePDF'
-import type { Profile, Invoice, LineItem } from '@/lib/types'
+import type { Profile, Invoice, LineItem, BankAccount, BankDetailsSnapshot } from '@/lib/types'
+import BankAccountSelector, {
+  EMPTY_CUSTOM,
+  buildBankSnapshot,
+  type CustomBankFields,
+} from '@/components/BankAccountSelector'
 
 // ─── Icon sub-components ────────────────────────────────────────────────────
 
@@ -190,9 +195,10 @@ interface PreviewProps {
   grand: number
   status?: string
   paymentDate?: string | null
+  bankSnapshot?: BankDetailsSnapshot | null
 }
 
-function InvoicePreview({ form, items, invNumber, subtotal, taxAmount, grand, status, paymentDate }: PreviewProps) {
+function InvoicePreview({ form, items, invNumber, subtotal, taxAmount, grand, status, paymentDate, bankSnapshot }: PreviewProps) {
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
   const isPaid = status === 'paid'
   const heading = isPaid ? 'Receipt' : 'Invoice'
@@ -212,7 +218,8 @@ function InvoicePreview({ form, items, invNumber, subtotal, taxAmount, grand, st
   }
 
   const currency = form.currency
-  const hasBankDetails = form.bankName || form.accountName || form.accountNumber
+  const bank = bankSnapshot
+  const hasBankDetails = !!(bank && (bank.bank_name || bank.account_name || bank.account_number))
 
   return (
     <div className="bg-white rounded-xl overflow-hidden" style={{ border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)' }}>
@@ -308,15 +315,15 @@ function InvoicePreview({ form, items, invNumber, subtotal, taxAmount, grand, st
         </div>
 
         {/* Payment details */}
-        {hasBankDetails && (
+        {hasBankDetails && bank && (
           <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(0,0,0,0.08)' }}>
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Payment details</p>
             <div className="text-xs text-gray-700 leading-6">
-              {form.bankName && <p><span className="text-gray-400">Bank:</span> {form.bankName}</p>}
-              {form.accountName && <p><span className="text-gray-400">Account name:</span> {form.accountName}</p>}
-              {form.accountNumber && <p><span className="text-gray-400">Account number:</span> {form.accountNumber}</p>}
-              {form.swiftCode && <p><span className="text-gray-400">SWIFT/BIC:</span> {form.swiftCode}</p>}
-              {form.iban && <p><span className="text-gray-400">IBAN:</span> {form.iban}</p>}
+              {bank.bank_name && <p><span className="text-gray-400">Bank:</span> {bank.bank_name}</p>}
+              {bank.account_name && <p><span className="text-gray-400">Account name:</span> {bank.account_name}</p>}
+              {bank.account_number && <p><span className="text-gray-400">Account number:</span> {bank.account_number}</p>}
+              {bank.swift_code && <p><span className="text-gray-400">SWIFT/BIC:</span> {bank.swift_code}</p>}
+              {bank.iban && <p><span className="text-gray-400">IBAN:</span> {bank.iban}</p>}
             </div>
           </div>
         )}
@@ -341,12 +348,6 @@ interface FormData {
   bizEmail: string
   currency: string
   taxRate: number
-  bankName: string
-  accountName: string
-  accountNumber: string
-  bankCountry: string
-  swiftCode: string
-  iban: string
 }
 
 // ─── Main component ──────────────────────────────────────────────────────────
@@ -354,9 +355,10 @@ interface FormData {
 interface Props {
   profile: Profile | null
   invoice?: Invoice | null
+  bankAccounts: BankAccount[]
 }
 
-export default function NewRenewalForm({ profile, invoice }: Props) {
+export default function NewRenewalForm({ profile, invoice, bankAccounts }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -383,13 +385,39 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
     bizEmail: profile?.business_email ?? '',
     currency: invoice?.currency ?? profile?.currency ?? 'NGN',
     taxRate: invoice?.tax_rate ?? profile?.tax_rate ?? 7.5,
-    bankName: profile?.bank_name ?? '',
-    accountName: profile?.account_name ?? '',
-    accountNumber: profile?.account_number ?? '',
-    bankCountry: profile?.bank_country ?? 'Nigeria',
-    swiftCode: profile?.swift_code ?? '',
-    iban: profile?.iban ?? '',
   })
+
+  // Bank account selection — default to invoice's saved account, else default account
+  const initialAccountId =
+    invoice?.bank_account_id ??
+    bankAccounts.find((a) => a.is_default)?.id ??
+    bankAccounts[0]?.id ??
+    null
+  const [selectedBankId, setSelectedBankId] = useState<string | null>(initialAccountId)
+
+  // Custom (one-off) bank fields — pre-fill from snapshot if invoice used custom details
+  const isExistingCustom =
+    !!invoice?.bank_details_snapshot && invoice.bank_account_id === null
+  const [useCustomBank, setUseCustomBank] = useState<boolean>(isExistingCustom)
+  const [customBank, setCustomBank] = useState<CustomBankFields>(() => {
+    if (isExistingCustom && invoice?.bank_details_snapshot) {
+      const s = invoice.bank_details_snapshot
+      return {
+        bank_name: s.bank_name,
+        account_name: s.account_name,
+        account_number: s.account_number,
+        bank_country: s.bank_country,
+        swift_code: s.swift_code ?? '',
+        iban: s.iban ?? '',
+      }
+    }
+    return EMPTY_CUSTOM
+  })
+
+  function currentSnapshot(): BankDetailsSnapshot | null {
+    const selected = bankAccounts.find((a) => a.id === selectedBankId) ?? null
+    return buildBankSnapshot(selected, useCustomBank, customBank, form.currency)
+  }
 
   const [items, setItems] = useState<LineItem[]>(
     Array.isArray(invoice?.line_items) ? invoice.line_items : []
@@ -406,6 +434,7 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
 
   // Build the PDF data object for reuse across handlers
   function getPDFData() {
+    const snap = currentSnapshot()
     return {
       invNumber,
       bizName: form.bizName,
@@ -422,12 +451,12 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
       subtotal,
       taxAmount,
       grand,
-      bankName: form.bankName || undefined,
-      accountName: form.accountName || undefined,
-      accountNumber: form.accountNumber || undefined,
-      bankCountry: form.bankCountry || undefined,
-      swiftCode: form.swiftCode || undefined,
-      iban: form.iban || undefined,
+      bankName: snap?.bank_name || undefined,
+      accountName: snap?.account_name || undefined,
+      accountNumber: snap?.account_number || undefined,
+      bankCountry: snap?.bank_country || undefined,
+      swiftCode: snap?.swift_code || undefined,
+      iban: snap?.iban || undefined,
     }
   }
 
@@ -463,6 +492,7 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
       const user = session?.user
       if (!user) { setSaveError('Not authenticated. Please refresh and try again.'); return }
 
+      const snap = currentSnapshot()
       const payload = {
         user_id: user.id,
         inv_number: invNumber,
@@ -480,6 +510,8 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
         total: grand,
         currency: form.currency,
         notes: form.clientNotes || null,
+        bank_account_id: useCustomBank ? null : (selectedBankId || null),
+        bank_details_snapshot: snap,
         updated_at: new Date().toISOString(),
       }
 
@@ -528,13 +560,10 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
       bizEmail: profile?.business_email ?? '',
       currency: profile?.currency ?? 'NGN',
       taxRate: profile?.tax_rate ?? 7.5,
-      bankName: profile?.bank_name ?? '',
-      accountName: profile?.account_name ?? '',
-      accountNumber: profile?.account_number ?? '',
-      bankCountry: profile?.bank_country ?? 'Nigeria',
-      swiftCode: profile?.swift_code ?? '',
-      iban: profile?.iban ?? '',
     })
+    setSelectedBankId(bankAccounts.find((a) => a.is_default)?.id ?? bankAccounts[0]?.id ?? null)
+    setUseCustomBank(false)
+    setCustomBank(EMPTY_CUSTOM)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -625,6 +654,7 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
       // Get base64 string (without the data URI prefix)
       const pdfBase64 = doc.output('datauristring').split(',')[1]
 
+      const snap = currentSnapshot()
       const res = await fetch('/api/send-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -643,11 +673,11 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
             subtotal,
             taxAmount,
             grand,
-            bankName: form.bankName,
-            accountName: form.accountName,
-            accountNumber: form.accountNumber,
-            swiftCode: form.swiftCode,
-            iban: form.iban,
+            bankName: snap?.bank_name ?? '',
+            accountName: snap?.account_name ?? '',
+            accountNumber: snap?.account_number ?? '',
+            swiftCode: snap?.swift_code ?? '',
+            iban: snap?.iban ?? '',
           },
           recipientEmail: form.clientEmail,
           pdfBase64,
@@ -765,6 +795,19 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
                 <input className={INPUT} type="number" min={0} step={0.5} value={form.taxRate} onChange={(e) => setField('taxRate', Number(e.target.value))} />
               </Field>
             </div>
+          </Card>
+
+          <Card>
+            <SectionTitle>Receiving account</SectionTitle>
+            <BankAccountSelector
+              accounts={bankAccounts}
+              selectedId={selectedBankId}
+              onSelectedChange={setSelectedBankId}
+              useCustom={useCustomBank}
+              onUseCustomChange={setUseCustomBank}
+              custom={customBank}
+              onCustomChange={setCustomBank}
+            />
           </Card>
 
           <div className="flex gap-2.5 mt-1">
@@ -894,6 +937,7 @@ export default function NewRenewalForm({ profile, invoice }: Props) {
             grand={grand}
             status={invoice?.status}
             paymentDate={(invoice as (Invoice & { payment_date?: string | null }) | null | undefined)?.payment_date ?? invoice?.updated_at ?? null}
+            bankSnapshot={currentSnapshot()}
           />
 
           {/* Action card */}

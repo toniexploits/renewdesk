@@ -537,6 +537,8 @@ export default function InvoiceRow({
         total: invoice.total,
         currency: invoice.currency,
         notes: invoice.notes,
+        bank_account_id: invoice.bank_account_id,
+        bank_details_snapshot: invoice.bank_details_snapshot,
       })
 
       if (error) {

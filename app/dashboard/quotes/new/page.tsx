@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import NewQuoteForm from './NewQuoteForm'
-import type { Profile, Quote } from '@/lib/types'
+import type { Profile, Quote, BankAccount } from '@/lib/types'
 
 export default async function NewQuotePage({
   searchParams,
@@ -10,7 +10,7 @@ export default async function NewQuotePage({
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: profile }, { data: quote }] = await Promise.all([
+  const [{ data: profile }, { data: quote }, { data: bankAccounts }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user!.id).single(),
     searchParams.edit
       ? supabase
@@ -20,6 +20,12 @@ export default async function NewQuotePage({
           .eq('user_id', user!.id)
           .single()
       : Promise.resolve({ data: null }),
+    supabase
+      .from('bank_accounts')
+      .select('*')
+      .eq('user_id', user!.id)
+      .order('is_default', { ascending: false })
+      .order('created_at', { ascending: true }),
   ])
 
   const isEditing = !!quote
@@ -39,6 +45,7 @@ export default async function NewQuotePage({
       <NewQuoteForm
         profile={profile as Profile | null}
         quote={quote as Quote | null}
+        bankAccounts={(bankAccounts as BankAccount[] | null) ?? []}
       />
     </div>
   )
