@@ -26,11 +26,15 @@ export async function POST(req: NextRequest) {
   const interval = body.interval as 'monthly' | 'yearly'
   const currency = (body.currency ?? profile?.billing_currency ?? 'NGN') as 'NGN' | 'USD'
 
+  console.log('[paystack/initialize] body:', { plan, interval, currency })
+
   if (!['pro', 'agency'].includes(plan) || !['monthly', 'yearly'].includes(interval)) {
     return NextResponse.json({ error: 'Invalid plan or interval' }, { status: 400 })
   }
 
   const amount = AMOUNTS[plan][currency][interval]
+  const amountInSubunit = Math.round(amount * 100)
+  console.log('[paystack/initialize] amount:', amount, '| in kobo/cents:', amountInSubunit)
 
   // Look up or create the Paystack plan code for recurring billing
   const admin = createAdminClient()
@@ -47,6 +51,7 @@ export async function POST(req: NextRequest) {
     const planName = `RenewDesk ${plan.charAt(0).toUpperCase() + plan.slice(1)} ${currency} ${interval}`
     const created = await createPlan(planName, amount, PAYSTACK_INTERVAL[interval], currency)
     planCode = created.plan_code as string
+    console.log('[paystack/initialize] created plan:', planCode)
 
     const updatedCodes = structuredClone(storedCodes)
     if (!updatedCodes[currency]) updatedCodes[currency] = {}
@@ -59,7 +64,7 @@ export async function POST(req: NextRequest) {
   }
 
   const email = user.email ?? ''
-  console.log('[paystack/initialize] email:', email, '| plan:', plan, interval, currency)
+  console.log('[paystack/initialize] email:', email, '| planCode:', planCode)
 
   const data = await initializeTransaction(
     email,
@@ -69,5 +74,7 @@ export async function POST(req: NextRequest) {
     planCode,
   )
 
-  return NextResponse.json({ ...data, email })
+  console.log('[paystack/initialize] Paystack response:', JSON.stringify(data))
+
+  return NextResponse.json({ ...data, email, amountInSubunit })
 }
