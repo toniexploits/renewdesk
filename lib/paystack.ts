@@ -22,6 +22,7 @@ export async function initializeTransaction(
   amount: number,
   currency: 'NGN' | 'USD',
   metadata: Record<string, unknown>,
+  planCode?: string,
 ) {
   return paystackRequest('POST', '/transaction/initialize', {
     email,
@@ -29,6 +30,7 @@ export async function initializeTransaction(
     currency,
     metadata,
     channels: ['card'],
+    ...(planCode ? { plan: planCode } : {}),
   })
 }
 

@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
         .update({
           paystack_subscription_code: data.subscription_code,
           paystack_plan_code: data.plan?.plan_code ?? null,
+          paystack_email_token: data.email_token ?? null,
           status: 'active',
           updated_at: new Date().toISOString(),
         })

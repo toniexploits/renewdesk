@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { initializeTransaction } from '@/lib/paystack'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { initializeTransaction, createPlan } from '@/lib/paystack'
 
 const AMOUNTS = {
   pro: { NGN: { monthly: 5000, yearly: 45000 }, USD: { monthly: 5, yearly: 50 } },
   agency: { NGN: { monthly: 15000, yearly: 135000 }, USD: { monthly: 15, yearly: 150 } },
 } as const
+
+const PAYSTACK_INTERVAL = { monthly: 'monthly', yearly: 'annually' } as const
 
 export async function POST(req: NextRequest) {
   const supabase = createClient()
@@ -29,16 +32,38 @@ export async function POST(req: NextRequest) {
 
   const amount = AMOUNTS[plan][currency][interval]
 
+  // Look up or create the Paystack plan code for recurring billing
+  const admin = createAdminClient()
+  const { data: planRow } = await admin
+    .from('subscription_plans')
+    .select('paystack_plan_codes')
+    .eq('name', plan)
+    .single()
+
+  const storedCodes = (planRow?.paystack_plan_codes ?? {}) as Record<string, Record<string, string>>
+  let planCode: string | undefined = storedCodes[currency]?.[interval]
+
+  if (!planCode) {
+    const planName = `RenewDesk ${plan.charAt(0).toUpperCase() + plan.slice(1)} ${currency} ${interval}`
+    const created = await createPlan(planName, amount, PAYSTACK_INTERVAL[interval], currency)
+    planCode = created.plan_code as string
+
+    const updatedCodes = structuredClone(storedCodes)
+    if (!updatedCodes[currency]) updatedCodes[currency] = {}
+    updatedCodes[currency][interval] = planCode
+
+    await admin
+      .from('subscription_plans')
+      .update({ paystack_plan_codes: updatedCodes })
+      .eq('name', plan)
+  }
+
   const data = await initializeTransaction(
     user.email!,
     amount,
     currency,
-    {
-      user_id: user.id,
-      plan_name: plan,
-      billing_interval: interval,
-      billing_currency: currency,
-    },
+    { user_id: user.id, plan_name: plan, billing_interval: interval, billing_currency: currency },
+    planCode,
   )
 
   return NextResponse.json(data)
