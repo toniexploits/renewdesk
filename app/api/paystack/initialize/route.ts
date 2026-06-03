@@ -58,13 +58,16 @@ export async function POST(req: NextRequest) {
       .eq('name', plan)
   }
 
+  const email = user.email ?? ''
+  console.log('[paystack/initialize] email:', email, '| plan:', plan, interval, currency)
+
   const data = await initializeTransaction(
-    user.email!,
+    email,
     amount,
     currency,
     { user_id: user.id, plan_name: plan, billing_interval: interval, billing_currency: currency },
     planCode,
   )
 
-  return NextResponse.json(data)
+  return NextResponse.json({ ...data, email })
 }

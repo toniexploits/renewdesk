@@ -99,12 +99,13 @@ export default function UpgradeModal({ isOpen, onClose, reason = 'upgrade', onSu
         body: JSON.stringify({ plan, interval, currency }),
       })
       if (!initRes.ok) throw new Error('Failed to initialize payment')
-      const { access_code, reference } = await initRes.json()
+      const { access_code, reference, email } = await initRes.json()
 
       // 2. Load Paystack inline and open popup
       await loadPaystackScript()
       const handler = window.PaystackPop.setup({
         key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY,
+        email,
         access_code,
         onSuccess: async () => {
           // 3. Verify on our backend
