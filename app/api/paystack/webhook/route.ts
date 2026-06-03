@@ -85,12 +85,6 @@ export async function POST(req: NextRequest) {
       const subCode = data.subscription?.subscription_code
       if (!subCode) break
 
-      const { data: sub } = await admin
-        .from('user_subscriptions')
-        .select('user_id')
-        .eq('paystack_subscription_code', subCode)
-        .single()
-
       await admin
         .from('user_subscriptions')
         .update({ status: 'past_due', updated_at: new Date().toISOString() })

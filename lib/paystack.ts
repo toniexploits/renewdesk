@@ -1,3 +1,5 @@
+import crypto from 'crypto'
+
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY!
 const BASE = 'https://api.paystack.co'
 
@@ -63,7 +65,6 @@ export async function createPlan(
 }
 
 export function verifyWebhookSignature(payload: string, signature: string): boolean {
-  const crypto = require('crypto')
   const secret = process.env.PAYSTACK_WEBHOOK_SECRET!
   const hash = crypto.createHmac('sha512', secret).update(payload).digest('hex')
   return hash === signature

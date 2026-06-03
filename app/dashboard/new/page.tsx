@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import NewRenewalForm from './NewRenewalForm'
 import type { Profile, Invoice, BankAccount } from '@/lib/types'
 import { canCreateInvoice } from '@/lib/usageLimits'
-import type { UsageResult } from '@/lib/usageLimits'
 
 export default async function NewRenewalPage({
   searchParams,
