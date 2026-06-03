@@ -78,6 +78,48 @@ export interface Invoice {
   updated_at: string
 }
 
+export interface SubscriptionPlan {
+  id: string
+  name: 'starter' | 'pro' | 'agency'
+  display_name: string
+  monthly_price_ngn: number
+  yearly_price_ngn: number
+  monthly_price_usd: number
+  yearly_price_usd: number
+  invoice_limit: number | null
+  quote_limit: number | null
+  bank_account_limit: number | null
+  features: string[]
+}
+
+export interface UserSubscription {
+  id: string
+  user_id: string
+  plan_name: 'starter' | 'pro' | 'agency'
+  billing_currency: 'NGN' | 'USD'
+  billing_interval: 'monthly' | 'yearly'
+  status: 'active' | 'cancelled' | 'past_due' | 'trialing'
+  paystack_customer_code: string | null
+  paystack_subscription_code: string | null
+  paystack_plan_code: string | null
+  current_period_start: string | null
+  current_period_end: string | null
+  cancel_at_period_end: boolean
+  cancelled_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface UsageTracking {
+  id: string
+  user_id: string
+  billing_month: string
+  invoices_created: number
+  quotes_created: number
+  reset_at: string | null
+  updated_at: string
+}
+
 export type QuoteStatus = 'draft' | 'sent' | 'approved' | 'converted'
 
 export interface Quote {

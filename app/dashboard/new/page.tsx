@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import NewRenewalForm from './NewRenewalForm'
 import type { Profile, Invoice, BankAccount } from '@/lib/types'
+import { canCreateInvoice } from '@/lib/usageLimits'
+import type { UsageResult } from '@/lib/usageLimits'
 
 export default async function NewRenewalPage({
   searchParams,
@@ -10,7 +12,7 @@ export default async function NewRenewalPage({
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [{ data: profile }, { data: invoice }, { data: bankAccounts }] = await Promise.all([
+  const [{ data: profile }, { data: invoice }, { data: bankAccounts }, usage] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user!.id).single(),
     searchParams.edit
       ? supabase.from('invoices').select('*').eq('id', searchParams.edit).eq('user_id', user!.id).single()
@@ -21,6 +23,7 @@ export default async function NewRenewalPage({
       .eq('user_id', user!.id)
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: true }),
+    canCreateInvoice(user!.id),
   ])
 
   const isEditing = !!invoice
@@ -41,6 +44,7 @@ export default async function NewRenewalPage({
         profile={profile as Profile | null}
         invoice={invoice as Invoice | null}
         bankAccounts={(bankAccounts as BankAccount[] | null) ?? []}
+        usage={usage}
       />
     </div>
   )

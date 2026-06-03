@@ -1,15 +1,17 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatAmount, CURRENCY_OPTIONS } from '@/lib/format'
 import { generatePDF } from '@/lib/generatePDF'
 import type { Profile, Invoice, LineItem, BankAccount, BankDetailsSnapshot } from '@/lib/types'
+import type { UsageResult } from '@/lib/usageLimits'
 import BankAccountSelector, {
   EMPTY_CUSTOM,
   buildBankSnapshot,
   type CustomBankFields,
 } from '@/components/BankAccountSelector'
+import UpgradeModal from '@/components/UpgradeModal'
 
 // ─── Icon sub-components ────────────────────────────────────────────────────
 
@@ -356,11 +358,19 @@ interface Props {
   profile: Profile | null
   invoice?: Invoice | null
   bankAccounts: BankAccount[]
+  usage?: UsageResult
 }
 
-export default function NewRenewalForm({ profile, invoice, bankAccounts }: Props) {
+export default function NewRenewalForm({ profile, invoice, bankAccounts, usage }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [warnDismissed, setWarnDismissed] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    const dismissed = sessionStorage.getItem('renewdesk_invoice_warn_dismissed')
+    if (dismissed) setWarnDismissed(true)
+  }, [])
   const [saveError, setSaveError] = useState<string | null>(null)
   const [savedInvoiceId, setSavedInvoiceId] = useState<string | null>(invoice?.id ?? null)
   const [invNumber] = useState(() => invoice?.inv_number ?? `INV-${Date.now().toString().slice(-6)}`)
@@ -724,8 +734,71 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts }: Props
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
+  const isBlocked = usage !== undefined && !usage.allowed
+  const showWarning = !warnDismissed && usage?.warningThreshold && usage.allowed
+
+  if (isBlocked) {
+    return (
+      <>
+        <div className="bg-white rounded-xl p-8 text-center" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
+          <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <h2 className="text-base font-bold text-gray-900 mb-1">Monthly invoice limit reached</h2>
+          <p className="text-sm text-gray-500 mb-5">
+            You&apos;ve used all {usage.limit} invoices for this month. Upgrade to Pro for unlimited invoices.
+          </p>
+          <button
+            onClick={() => setUpgradeOpen(true)}
+            className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-brand hover:bg-brand-dark transition-colors"
+          >
+            Upgrade to Pro
+          </button>
+        </div>
+        <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} reason="limit" />
+      </>
+    )
+  }
+
   return (
     <div>
+      {showWarning && (
+        <div
+          className="flex items-start gap-3 px-4 py-3 rounded-xl mb-3 text-sm"
+          style={{ background: '#FAEEDA', color: '#633806' }}
+        >
+          <span className="flex-shrink-0 mt-0.5">⚠️</span>
+          <div className="flex-1 min-w-0">
+            <span className="font-medium">
+              You&apos;ve used {usage.current} of {usage.limit} free invoices this month.
+            </span>{' '}
+            Upgrade to Pro for unlimited invoices.
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => setUpgradeOpen(true)}
+              className="text-xs font-semibold underline underline-offset-2"
+            >
+              Upgrade now
+            </button>
+            <button
+              onClick={() => {
+                setWarnDismissed(true)
+                sessionStorage.setItem('renewdesk_invoice_warn_dismissed', '1')
+              }}
+              className="text-xs opacity-60 hover:opacity-100 transition-opacity ml-1"
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
+      <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+
       <StepIndicator step={step} />
 
       {/* ── STEP 1 ─────────────────────────────────────────────────────────── */}

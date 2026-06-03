@@ -27,6 +27,8 @@ export interface QuotePDFData {
   clientName: string
   contactName?: string
   clientEmail?: string
+  /** When true the footer branding is suppressed. */
+  removeBranding?: boolean
   serviceName?: string
   servicePlan?: string
   validUntil?: string
@@ -226,16 +228,18 @@ export function generateQuotePDF(data: QuotePDFData): jsPDF {
   doc.text(pdfAmount(data.grand, data.currency), colAmt, y, { align: 'right' })
 
   // ── Footer ────────────────────────────────────────────────────────────────────
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-  doc.setTextColor(158, 158, 153)
-  doc.text(
-    data.validUntil
-      ? `Generated with RenewDesk by Barastreams · This quote is valid until ${validUntilFmt}.`
-      : 'Generated with RenewDesk by Barastreams',
-    margin,
-    282
-  )
+  if (!data.removeBranding) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(158, 158, 153)
+    doc.text(
+      data.validUntil
+        ? `Generated with RenewDesk by Barastreams · renewdesk.com · This quote is valid until ${validUntilFmt}.`
+        : 'Generated with RenewDesk by Barastreams · renewdesk.com',
+      margin,
+      282
+    )
+  }
 
   return doc
 }

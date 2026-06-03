@@ -1,7 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useSubscription } from '@/hooks/useSubscription'
+import UpgradeModal from '@/components/UpgradeModal'
 
 const navItems = [
   {
@@ -83,8 +86,16 @@ function isActive(href: string, exact: boolean, pathname: string) {
   return pathname.startsWith(href)
 }
 
+const PLAN_COLORS: Record<string, string> = {
+  starter: 'bg-white/10 text-white/50',
+  pro: 'bg-brand/20 text-brand',
+  agency: 'bg-purple-500/20 text-purple-300',
+}
+
 export default function Sidebar() {
   const pathname = usePathname()
+  const { plan, loading: subLoading } = useSubscription()
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
 
   return (
     <>
@@ -127,7 +138,38 @@ export default function Sidebar() {
               </Link>
             )
           })}
+
+          <Link
+            href="/pricing"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/60 hover:text-white hover:bg-white/[0.07] transition-colors"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+            Pricing
+          </Link>
         </nav>
+
+        {/* Plan badge + upgrade */}
+        {!subLoading && (
+          <div className="px-3 pb-4" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="pt-3 flex items-center justify-between">
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize ${PLAN_COLORS[plan] ?? PLAN_COLORS.starter}`}>
+                {plan}
+              </span>
+              {plan === 'starter' && (
+                <button
+                  onClick={() => setUpgradeOpen(true)}
+                  className="text-xs font-medium text-brand hover:text-brand-dark transition-colors"
+                >
+                  Upgrade ↑
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
       </aside>
 
       {/* Mobile bottom nav — excludes New Renewal (accessible via header button) */}

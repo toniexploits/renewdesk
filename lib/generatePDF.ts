@@ -23,6 +23,8 @@ function pdfAmount(amount: number, currency: string): string {
 // ─── Data interface ───────────────────────────────────────────────────────────
 
 export interface InvoicePDFData {
+  /** When true the footer branding is suppressed (Pro/Agency with remove_branding). */
+  removeBranding?: boolean
   invNumber: string
   bizName: string
   bizEmail: string
@@ -292,16 +294,18 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
   }
 
   // ── Footer ────────────────────────────────────────────────────────────────────
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-  doc.setTextColor(158, 158, 153)
-  doc.text(
-    isPaid
-      ? 'Generated with RenewDesk by Barastreams · Thank you for your payment.'
-      : 'Generated with RenewDesk by Barastreams · Thank you for your business.',
-    margin,
-    282
-  )
+  if (!data.removeBranding) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(158, 158, 153)
+    doc.text(
+      isPaid
+        ? 'Generated with RenewDesk by Barastreams · renewdesk.com · Thank you for your payment.'
+        : 'Generated with RenewDesk by Barastreams · renewdesk.com · Thank you for your business.',
+      margin,
+      282
+    )
+  }
 
   return doc
 }

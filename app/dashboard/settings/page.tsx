@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { CURRENCY_OPTIONS } from '@/lib/format'
-import type { BankAccount } from '@/lib/types'
+import type { BankAccount, UserSubscription } from '@/lib/types'
 import { maskAccountNumber } from '@/components/BankAccountSelector'
+import UpgradeModal from '@/components/UpgradeModal'
 
 const INPUT = 'w-full px-3.5 py-2.5 rounded-lg bg-surface border border-black/10 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all placeholder:text-gray-300 text-base text-gray-900'
 
@@ -69,6 +70,12 @@ export default function SettingsPage() {
   })
 
   const [accounts, setAccounts] = useState<BankAccount[]>([])
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null)
+  const [usage, setUsage] = useState<{ invoices_created: number; quotes_created: number } | null>(null)
+  const [billingCurrency, setBillingCurrencyState] = useState<'NGN' | 'USD'>('NGN')
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [cancelConfirm, setCancelConfirm] = useState(false)
+  const [cancelLoading, setCancelLoading] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [accountForm, setAccountForm] = useState<AccountFormState>(EMPTY_FORM)
@@ -85,7 +92,8 @@ export default function SettingsPage() {
       if (!user) { setLoading(false); return }
       setUserId(user.id)
 
-      const [profileRes, accountsRes] = await Promise.all([
+      const month = new Date().toISOString().slice(0, 7)
+      const [profileRes, accountsRes, subRes, usageRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase
           .from('bank_accounts')
@@ -93,6 +101,8 @@ export default function SettingsPage() {
           .eq('user_id', user.id)
           .order('is_default', { ascending: false })
           .order('created_at', { ascending: true }),
+        supabase.from('user_subscriptions').select('*').eq('user_id', user.id).single(),
+        supabase.from('usage_tracking').select('*').eq('user_id', user.id).eq('billing_month', month).single(),
       ])
 
       if (profileRes.data) {
@@ -103,8 +113,11 @@ export default function SettingsPage() {
           currency: profileRes.data.currency ?? 'NGN',
           tax_rate: profileRes.data.tax_rate ?? 7.5,
         })
+        setBillingCurrencyState(profileRes.data.billing_currency ?? 'NGN')
       }
       if (accountsRes.data) setAccounts(accountsRes.data as BankAccount[])
+      if (subRes.data) setSubscription(subRes.data as UserSubscription)
+      if (usageRes.data) setUsage(usageRes.data)
       setLoading(false)
     }
 
@@ -150,6 +163,22 @@ export default function SettingsPage() {
       setFeedback({ type: 'error', message: 'An unexpected error occurred.' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleCancelSubscription() {
+    if (!userId || !subscription?.paystack_subscription_code) return
+    setCancelLoading(true)
+    try {
+      await fetch('/api/paystack/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscriptionCode: subscription.paystack_subscription_code }),
+      })
+      setSubscription(s => s ? { ...s, cancel_at_period_end: true } : s)
+      setCancelConfirm(false)
+    } finally {
+      setCancelLoading(false)
     }
   }
 
@@ -535,6 +564,193 @@ export default function SettingsPage() {
             )}
           </div>
         </>
+      )}
+
+      {/* ── Billing section ────────────────────────────────────────────── */}
+      <div className="mt-8 mb-4">
+        <SectionTitle>Billing &amp; Subscription</SectionTitle>
+
+        {/* Current plan card */}
+        <div
+          className="bg-white rounded-xl p-4 mb-3"
+          style={{ border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Current plan</p>
+              <div className="flex items-center gap-2">
+                <span className="text-base font-bold text-gray-900 capitalize">
+                  {subscription?.plan_name ?? 'Starter'}
+                </span>
+                {subscription?.status && (
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                    subscription.status === 'active' ? 'bg-brand/10 text-brand' :
+                    subscription.status === 'past_due' ? 'bg-amber-100 text-amber-700' :
+                    subscription.status === 'cancelled' ? 'bg-gray-100 text-gray-500' :
+                    'bg-gray-100 text-gray-500'
+                  }`}>
+                    {subscription.status === 'active' ? 'Active' :
+                     subscription.status === 'past_due' ? 'Past due' :
+                     subscription.status === 'cancelled' ? 'Cancelled' : subscription.status}
+                  </span>
+                )}
+                {subscription?.cancel_at_period_end && (
+                  <span className="text-[11px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                    Cancels {subscription.current_period_end
+                      ? new Date(subscription.current_period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                      : 'at period end'}
+                  </span>
+                )}
+              </div>
+              {subscription && subscription.plan_name !== 'starter' && (
+                <p className="text-xs text-gray-400 mt-1">
+                  {subscription.billing_interval === 'monthly' ? 'Monthly' : 'Yearly'} · {subscription.billing_currency} ·{' '}
+                  {subscription.current_period_end
+                    ? `Renews ${new Date(subscription.current_period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                    : ''}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 items-end">
+              {(!subscription || subscription.plan_name === 'starter') && (
+                <button
+                  onClick={() => setUpgradeOpen(true)}
+                  className="px-3.5 py-2 rounded-lg text-sm font-semibold text-white bg-brand hover:bg-brand-dark transition-colors"
+                >
+                  Upgrade
+                </button>
+              )}
+              {subscription && subscription.plan_name !== 'starter' && !subscription.cancel_at_period_end && (
+                <>
+                  {subscription.billing_interval === 'monthly' && (
+                    <button
+                      onClick={() => setUpgradeOpen(true)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium border border-black/10 text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      Switch to yearly
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setCancelConfirm(true)}
+                    className="text-xs text-red-500 hover:text-red-600 transition-colors"
+                  >
+                    Cancel subscription
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Usage (Starter only) */}
+        {(!subscription || subscription.plan_name === 'starter') && usage && (
+          <div
+            className="bg-white rounded-xl p-4 mb-3"
+            style={{ border: '1px solid rgba(0,0,0,0.08)' }}
+          >
+            <p className="text-xs text-gray-400 mb-3">Usage this month</p>
+            <div className="space-y-3">
+              <div>
+                <div className="flex justify-between text-xs text-gray-600 mb-1">
+                  <span>Invoices</span>
+                  <span>{usage.invoices_created} / 5</span>
+                </div>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-brand rounded-full transition-all"
+                    style={{ width: `${Math.min(100, (usage.invoices_created / 5) * 100)}%` }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs text-gray-600 mb-1">
+                  <span>Quotes</span>
+                  <span>{usage.quotes_created} / 3</span>
+                </div>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-brand rounded-full transition-all"
+                    style={{ width: `${Math.min(100, (usage.quotes_created / 3) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+            <p className="text-[11px] text-gray-400 mt-3">
+              Resets on the 1st of next month.
+            </p>
+          </div>
+        )}
+
+        {/* Billing currency */}
+        <div
+          className="bg-white rounded-xl p-4"
+          style={{ border: '1px solid rgba(0,0,0,0.08)' }}
+        >
+          <p className="text-xs text-gray-400 mb-2">Billing currency</p>
+          <div className="grid grid-cols-2 gap-2">
+            {(['NGN', 'USD'] as const).map(c => (
+              <button
+                key={c}
+                type="button"
+                disabled={saving}
+                onClick={async () => {
+                  setBillingCurrencyState(c)
+                  const supabase = createClient()
+                  await supabase.from('profiles').update({ billing_currency: c }).eq('id', userId!)
+                }}
+                className={`px-3 py-2 rounded-lg text-sm border transition-all text-left ${
+                  billingCurrency === c
+                    ? 'border-brand bg-brand/5 text-brand font-medium'
+                    : 'border-black/10 bg-surface text-gray-700'
+                }`}
+              >
+                {c === 'NGN' ? 'NGN — Nigerian Naira ₦' : 'USD — US Dollar $'}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Upgrade modal */}
+      <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+
+      {/* Cancel confirmation */}
+      {cancelConfirm && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center px-4"
+          style={{ background: 'rgba(0,0,0,0.4)' }}
+          onClick={() => setCancelConfirm(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl p-5 w-full max-w-sm"
+            style={{ border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 20px 50px rgba(0,0,0,0.18)' }}
+          >
+            <p className="text-sm font-semibold text-gray-900 mb-1">Cancel subscription?</p>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              You&rsquo;ll keep access until{' '}
+              {subscription?.current_period_end
+                ? new Date(subscription.current_period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+                : 'the end of your billing period'}
+              , then revert to Starter.
+            </p>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setCancelConfirm(false)}
+                className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-black/10 rounded-lg hover:bg-gray-50"
+              >
+                Keep subscription
+              </button>
+              <button
+                onClick={handleCancelSubscription}
+                disabled={cancelLoading}
+                className="flex-1 px-3 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-60"
+              >
+                {cancelLoading ? 'Cancelling…' : 'Yes, cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Delete confirmation */}

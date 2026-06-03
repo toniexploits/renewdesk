@@ -11,6 +11,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [billingCurrency, setBillingCurrency] = useState<'NGN' | 'USD'>('NGN')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -36,7 +37,7 @@ export default function SignupPage() {
       email,
       password,
       options: {
-        data: { full_name: fullName },
+        data: { full_name: fullName, billing_currency: billingCurrency },
       },
     })
 
@@ -160,6 +161,29 @@ export default function SignupPage() {
               placeholder="••••••••"
               className="w-full px-3.5 py-2.5 rounded-lg text-sm bg-surface border border-black/10 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all placeholder:text-gray-400"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Billing currency
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['NGN', 'USD'] as const).map(c => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setBillingCurrency(c)}
+                  className={`px-3.5 py-2.5 rounded-lg text-sm border transition-all text-left ${
+                    billingCurrency === c
+                      ? 'border-brand bg-brand/5 text-brand font-medium'
+                      : 'border-black/10 bg-surface text-gray-700 hover:border-black/20'
+                  }`}
+                >
+                  {c === 'NGN' ? 'NGN — Nigerian Naira ₦' : 'USD — US Dollar $'}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-1.5">You can change this later in settings.</p>
           </div>
 
           {error && (
