@@ -49,7 +49,6 @@ export default async function AdminSubscriptionsPage() {
     .filter(s => s.billing_currency === 'USD' && s.billing_interval === 'monthly')
     .reduce((acc, s) => acc + planAmount(s.plan_name, 'USD', 'monthly'), 0)
 
-  // Convert yearly to monthly equivalent
   const mrrFromYearlyNGN = activePaying
     .filter(s => s.billing_currency === 'NGN' && s.billing_interval === 'yearly')
     .reduce((acc, s) => acc + planAmount(s.plan_name, 'NGN', 'yearly') / 12, 0)
@@ -86,10 +85,10 @@ export default async function AdminSubscriptionsPage() {
   ]
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-white">Subscriptions</h1>
-        <p className="text-sm text-white/50 mt-0.5">Subscription metrics and all user plans</p>
+        <h1 className="text-xl font-bold text-gray-900">Subscriptions</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Subscription metrics and all user plans</p>
       </div>
 
       {/* Metrics */}
@@ -97,25 +96,21 @@ export default async function AdminSubscriptionsPage() {
         {metrics.map(m => (
           <div
             key={m.label}
-            className="rounded-xl p-4"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
+            className="bg-white rounded-xl p-4 border border-gray-200"
           >
-            <p className="text-xs text-white/40 mb-1">{m.label}</p>
-            <p className="text-lg font-bold text-white">{m.value}</p>
+            <p className="text-xs text-gray-500 mb-1">{m.label}</p>
+            <p className="text-lg font-bold text-gray-900">{m.value}</p>
           </div>
         ))}
       </div>
 
       {/* Table */}
-      <div
-        className="rounded-xl overflow-hidden"
-        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-      >
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <tr className="border-b border-gray-100">
               {['User', 'Plan', 'Interval', 'Currency', 'Amount', 'Status', 'Next billing', 'Joined'].map(h => (
-                <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold text-white/40 uppercase tracking-wide">
+                <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
                   {h}
                 </th>
               ))}
@@ -128,20 +123,19 @@ export default async function AdminSubscriptionsPage() {
               return (
                 <tr
                   key={sub.id}
-                  style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
-                  className="hover:bg-white/[0.03] transition-colors"
+                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
                 >
-                  <td className="px-4 py-3 text-white">
-                    <p className="font-medium truncate max-w-[140px]">
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-gray-900 truncate max-w-[140px]">
                       {profile?.business_name ?? profile?.full_name ?? '—'}
                     </p>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="capitalize text-white/70">{sub.plan_name}</span>
+                    <span className="capitalize text-gray-700">{sub.plan_name}</span>
                   </td>
-                  <td className="px-4 py-3 text-white/50 capitalize">{sub.billing_interval}</td>
-                  <td className="px-4 py-3 text-white/50">{sub.billing_currency}</td>
-                  <td className="px-4 py-3 text-white/70">
+                  <td className="px-4 py-3 text-gray-500 capitalize">{sub.billing_interval}</td>
+                  <td className="px-4 py-3 text-gray-500">{sub.billing_currency}</td>
+                  <td className="px-4 py-3 text-gray-700">
                     {amount > 0 ? fmtCurrency(amount, sub.billing_currency) : 'Free'}
                   </td>
                   <td className="px-4 py-3">
@@ -149,15 +143,15 @@ export default async function AdminSubscriptionsPage() {
                       {sub.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-white/50">{fmtDate(sub.current_period_end)}</td>
-                  <td className="px-4 py-3 text-white/40">{fmtDate(sub.created_at)}</td>
+                  <td className="px-4 py-3 text-gray-500">{fmtDate(sub.current_period_end)}</td>
+                  <td className="px-4 py-3 text-gray-400">{fmtDate(sub.created_at)}</td>
                 </tr>
               )
             })}
           </tbody>
         </table>
         {(!subs || subs.length === 0) && (
-          <div className="py-12 text-center text-white/30 text-sm">No subscriptions yet.</div>
+          <div className="py-12 text-center text-gray-400 text-sm">No subscriptions yet.</div>
         )}
       </div>
     </div>
