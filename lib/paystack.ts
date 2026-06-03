@@ -76,10 +76,10 @@ export function verifyWebhookSignature(payload: string, signature: string): bool
 export const PLAN_AMOUNTS = {
   pro: {
     NGN: { monthly: 500000, yearly: 4500000 },
-    USD: { monthly: 500, yearly: 5000 },
+    USD: { monthly: 500, yearly: 4500 },
   },
   agency: {
     NGN: { monthly: 1500000, yearly: 13500000 },
-    USD: { monthly: 1500, yearly: 15000 },
+    USD: { monthly: 1500, yearly: 13500 },
   },
 } as const

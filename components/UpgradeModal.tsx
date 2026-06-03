@@ -73,8 +73,8 @@ export default function UpgradeModal({ isOpen, onClose, reason = 'upgrade', onSu
   const symbol = currency === 'NGN' ? '₦' : '$'
 
   const PRICES = {
-    pro: { NGN: { monthly: 5000, yearly: 45000 }, USD: { monthly: 5, yearly: 50 } },
-    agency: { NGN: { monthly: 15000, yearly: 135000 }, USD: { monthly: 15, yearly: 150 } },
+    pro: { NGN: { monthly: 5000, yearly: 45000 }, USD: { monthly: 5, yearly: 45 } },
+    agency: { NGN: { monthly: 15000, yearly: 135000 }, USD: { monthly: 15, yearly: 135 } },
   }
 
   function price(plan: 'pro' | 'agency') {
@@ -189,7 +189,7 @@ export default function UpgradeModal({ isOpen, onClose, reason = 'upgrade', onSu
                   interval === iv ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {iv === 'monthly' ? 'Monthly' : `Yearly — save up to ${currency === 'NGN' ? 3 : 2} months`}
+                {iv === 'monthly' ? 'Monthly' : 'Yearly — save 3 months'}
               </button>
             ))}
           </div>

@@ -30,7 +30,7 @@ const PLANS = [
     key: 'pro',
     name: 'Pro',
     tagline: 'For active freelancers & solo agencies',
-    prices: { NGN: { monthly: 5000, yearly: 45000 }, USD: { monthly: 5, yearly: 50 } },
+    prices: { NGN: { monthly: 5000, yearly: 45000 }, USD: { monthly: 5, yearly: 45 } },
     features: [
       { label: 'Unlimited invoices', included: true },
       { label: 'Unlimited quotes', included: true },
@@ -50,7 +50,7 @@ const PLANS = [
     key: 'agency',
     name: 'Agency',
     tagline: 'For growing teams & agencies',
-    prices: { NGN: { monthly: 15000, yearly: 135000 }, USD: { monthly: 15, yearly: 150 } },
+    prices: { NGN: { monthly: 15000, yearly: 135000 }, USD: { monthly: 15, yearly: 135 } },
     features: [
       { label: 'Unlimited invoices', included: true },
       { label: 'Unlimited quotes', included: true },
@@ -93,7 +93,6 @@ export default function PricingPage() {
   const [upgradeOpen, setUpgradeOpen] = useState(false)
 
   const symbol = currency === 'NGN' ? '₦' : '$'
-  const maxMonthsSaved = currency === 'NGN' ? 3 : 2
 
   useEffect(() => {
     const supabase = createClient()
@@ -209,7 +208,7 @@ export default function PricingPage() {
                   billingInterval === iv ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {iv === 'monthly' ? 'Monthly' : `Yearly — save up to ${maxMonthsSaved} months`}
+                {iv === 'monthly' ? 'Monthly' : 'Yearly — save 3 months'}
               </button>
             ))}
           </div>

@@ -4,8 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { initializeTransaction, createPlan } from '@/lib/paystack'
 
 const AMOUNTS = {
-  pro: { NGN: { monthly: 5000, yearly: 45000 }, USD: { monthly: 5, yearly: 50 } },
-  agency: { NGN: { monthly: 15000, yearly: 135000 }, USD: { monthly: 15, yearly: 150 } },
+  pro: { NGN: { monthly: 5000, yearly: 45000 }, USD: { monthly: 5, yearly: 45 } },
+  agency: { NGN: { monthly: 15000, yearly: 135000 }, USD: { monthly: 15, yearly: 135 } },
 } as const
 
 const PAYSTACK_INTERVAL = { monthly: 'monthly', yearly: 'annually' } as const
