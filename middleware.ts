@@ -30,8 +30,13 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
-  const isAuthRoute  = pathname === '/login' || pathname === '/signup'
-  const isAdminRoute = pathname.startsWith('/rd-admin')
+  const isAuthRoute   = pathname === '/login' || pathname === '/signup'
+  const isPublicRoute = isAuthRoute
+    || pathname === '/forgot-password'
+    || pathname === '/reset-password'
+    || pathname === '/pricing'
+    || pathname === '/'
+  const isAdminRoute  = pathname.startsWith('/rd-admin')
 
   if (isAuthRoute && user) {
     const url = request.nextUrl.clone()
@@ -39,7 +44,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (!isAuthRoute && !user) {
+  if (!isPublicRoute && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

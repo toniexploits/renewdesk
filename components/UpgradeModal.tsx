@@ -81,10 +81,10 @@ export default function UpgradeModal({ isOpen, onClose, reason = 'upgrade', onSu
     return PRICES[plan][currency][interval].toLocaleString()
   }
 
-  function savings(plan: 'pro' | 'agency') {
-    const monthly = PRICES[plan][currency].monthly * 12
-    const yearly = PRICES[plan][currency].yearly
-    return (monthly - yearly).toLocaleString()
+  function savingsInfo(plan: 'pro' | 'agency') {
+    const monthly = PRICES[plan][currency].monthly
+    const saving = monthly * 12 - PRICES[plan][currency].yearly
+    return { amount: saving.toLocaleString(), months: Math.round(saving / monthly) }
   }
 
   async function handleSelectPlan(plan: 'pro' | 'agency') {
@@ -189,7 +189,7 @@ export default function UpgradeModal({ isOpen, onClose, reason = 'upgrade', onSu
                   interval === iv ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {iv === 'monthly' ? 'Monthly' : 'Yearly — save 2 months'}
+                {iv === 'monthly' ? 'Monthly' : `Yearly — save up to ${currency === 'NGN' ? 3 : 2} months`}
               </button>
             ))}
           </div>
@@ -209,7 +209,9 @@ export default function UpgradeModal({ isOpen, onClose, reason = 'upgrade', onSu
                   <span className="text-xs text-gray-400">/{interval === 'monthly' ? 'mo' : 'yr'}</span>
                 </div>
                 {interval === 'yearly' && (
-                  <p className="text-xs text-brand font-medium mt-0.5">Save {symbol}{savings('pro')}/year</p>
+                  <p className="text-xs text-brand font-medium mt-0.5">
+                    Save {symbol}{savingsInfo('pro').amount} · {savingsInfo('pro').months} months free
+                  </p>
                 )}
               </div>
               <ul className="space-y-1.5 mb-4 flex-1">
@@ -241,7 +243,9 @@ export default function UpgradeModal({ isOpen, onClose, reason = 'upgrade', onSu
                   <span className="text-xs text-gray-400">/{interval === 'monthly' ? 'mo' : 'yr'}</span>
                 </div>
                 {interval === 'yearly' && (
-                  <p className="text-xs text-brand font-medium mt-0.5">Save {symbol}{savings('agency')}/year</p>
+                  <p className="text-xs text-brand font-medium mt-0.5">
+                    Save {symbol}{savingsInfo('agency').amount} · {savingsInfo('agency').months} months free
+                  </p>
                 )}
               </div>
               <ul className="space-y-1.5 mb-4 flex-1">

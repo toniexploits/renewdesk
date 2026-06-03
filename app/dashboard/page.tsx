@@ -2,10 +2,15 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import MetricCard from '@/components/MetricCard'
 import InvoiceRow from '@/components/InvoiceRow'
+import UpgradeDetector from '@/components/dashboard/UpgradeDetector'
 import { formatAmount } from '@/lib/format'
 import type { Invoice } from '@/lib/types'
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { upgrade?: string }
+}) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -37,8 +42,13 @@ export default async function DashboardPage() {
 
   const recent = allInvoices.slice(0, 5)
 
+  const upgradePlan = searchParams.upgrade === 'pro' || searchParams.upgrade === 'agency'
+    ? searchParams.upgrade
+    : null
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      {upgradePlan && <UpgradeDetector />}
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>

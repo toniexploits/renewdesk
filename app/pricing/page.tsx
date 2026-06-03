@@ -1,7 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
+import UpgradeModal from '@/components/UpgradeModal'
 
 const PLANS = [
   {
@@ -9,8 +11,6 @@ const PLANS = [
     name: 'Starter',
     tagline: 'For freelancers just getting started',
     prices: { NGN: { monthly: 0, yearly: 0 }, USD: { monthly: 0, yearly: 0 } },
-    invoiceLimit: '5 invoices/month',
-    quoteLimit: '3 quotes/month',
     features: [
       { label: '5 invoices per month', included: true },
       { label: '3 quotes per month', included: true },
@@ -24,8 +24,6 @@ const PLANS = [
       { label: 'Remove branding', included: false },
       { label: 'Team members', included: false },
     ],
-    cta: 'Get started free',
-    href: '/signup',
     highlight: false,
   },
   {
@@ -33,8 +31,6 @@ const PLANS = [
     name: 'Pro',
     tagline: 'For active freelancers & solo agencies',
     prices: { NGN: { monthly: 5000, yearly: 45000 }, USD: { monthly: 5, yearly: 50 } },
-    invoiceLimit: 'Unlimited',
-    quoteLimit: 'Unlimited',
     features: [
       { label: 'Unlimited invoices', included: true },
       { label: 'Unlimited quotes', included: true },
@@ -48,8 +44,6 @@ const PLANS = [
       { label: 'Remove branding', included: true },
       { label: 'Team members', included: false },
     ],
-    cta: 'Get started',
-    href: '/signup?plan=pro',
     highlight: true,
   },
   {
@@ -57,8 +51,6 @@ const PLANS = [
     name: 'Agency',
     tagline: 'For growing teams & agencies',
     prices: { NGN: { monthly: 15000, yearly: 135000 }, USD: { monthly: 15, yearly: 150 } },
-    invoiceLimit: 'Unlimited',
-    quoteLimit: 'Unlimited',
     features: [
       { label: 'Unlimited invoices', included: true },
       { label: 'Unlimited quotes', included: true },
@@ -72,8 +64,6 @@ const PLANS = [
       { label: 'Remove branding', included: true },
       { label: 'Team members', included: true },
     ],
-    cta: 'Get started',
-    href: '/signup?plan=agency',
     highlight: false,
   },
 ]
@@ -97,7 +87,31 @@ function CrossIcon() {
 export default function PricingPage() {
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
   const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN')
+  const [loggedIn, setLoggedIn] = useState(false)
+  const [currentPlan, setCurrentPlan] = useState<string>('starter')
+  const [authLoading, setAuthLoading] = useState(true)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
+
   const symbol = currency === 'NGN' ? '₦' : '$'
+  const maxMonthsSaved = currency === 'NGN' ? 3 : 2
+
+  useEffect(() => {
+    const supabase = createClient()
+    async function loadAuth() {
+      const result = await supabase.auth.getSession()
+      const session = result.data.session
+      if (!session) { setAuthLoading(false); return }
+      setLoggedIn(true)
+      const { data: sub } = await supabase
+        .from('user_subscriptions')
+        .select('plan_name')
+        .eq('user_id', session.user.id)
+        .single()
+      setCurrentPlan(sub?.plan_name ?? 'starter')
+      setAuthLoading(false)
+    }
+    loadAuth()
+  }, [])
 
   function formatPrice(plan: typeof PLANS[0]) {
     const p = plan.prices[currency][billingInterval]
@@ -106,9 +120,44 @@ export default function PricingPage() {
   }
 
   function yearlySavings(plan: typeof PLANS[0]) {
-    const monthly12 = plan.prices[currency].monthly * 12
-    const yearly = plan.prices[currency].yearly
-    return monthly12 - yearly
+    const monthly = plan.prices[currency].monthly
+    const saving = monthly * 12 - plan.prices[currency].yearly
+    const monthsSaved = Math.round(saving / monthly)
+    return { saving, monthsSaved }
+  }
+
+  function getPlanCTA(planKey: string) {
+    if (planKey === 'starter') {
+      return {
+        label: loggedIn ? 'Go to dashboard' : 'Get started free',
+        href: loggedIn ? '/dashboard' : '/signup',
+        onClick: undefined,
+        disabled: false,
+        isCurrent: currentPlan === 'starter' && loggedIn,
+      }
+    }
+
+    if (!loggedIn) {
+      return {
+        label: 'Get started',
+        href: `/signup?plan=${planKey}&interval=monthly`,
+        onClick: undefined,
+        disabled: false,
+        isCurrent: false,
+      }
+    }
+
+    if (currentPlan === planKey) {
+      return { label: 'Current plan', href: '#', onClick: undefined, disabled: true, isCurrent: true }
+    }
+
+    return {
+      label: currentPlan === 'starter' ? 'Upgrade' : 'Switch plan',
+      href: '#',
+      onClick: () => { setUpgradeOpen(true) },
+      disabled: false,
+      isCurrent: false,
+    }
   }
 
   return (
@@ -126,10 +175,18 @@ export default function PricingPage() {
             <span className="text-sm font-bold text-gray-900">RenewDesk</span>
           </Link>
           <div className="flex items-center gap-3">
-            <Link href="/login" className="text-sm text-gray-500 hover:text-gray-700 transition-colors">Sign in</Link>
-            <Link href="/signup" className="text-sm font-semibold text-white bg-brand hover:bg-brand-dark px-3.5 py-2 rounded-lg transition-colors">
-              Get started free
-            </Link>
+            {loggedIn ? (
+              <Link href="/dashboard" className="text-sm font-semibold text-white bg-brand hover:bg-brand-dark px-3.5 py-2 rounded-lg transition-colors">
+                Go to dashboard
+              </Link>
+            ) : (
+              <>
+                <Link href="/login" className="text-sm text-gray-500 hover:text-gray-700 transition-colors">Sign in</Link>
+                <Link href="/signup" className="text-sm font-semibold text-white bg-brand hover:bg-brand-dark px-3.5 py-2 rounded-lg transition-colors">
+                  Get started free
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -143,7 +200,6 @@ export default function PricingPage() {
 
         {/* Toggles */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
-          {/* Billing interval */}
           <div className="flex items-center gap-1 bg-white rounded-xl p-1" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
             {(['monthly', 'yearly'] as const).map(iv => (
               <button
@@ -153,12 +209,11 @@ export default function PricingPage() {
                   billingInterval === iv ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {iv === 'monthly' ? 'Monthly' : 'Yearly — save 2 months'}
+                {iv === 'monthly' ? 'Monthly' : `Yearly — save up to ${maxMonthsSaved} months`}
               </button>
             ))}
           </div>
 
-          {/* Currency */}
           <div className="flex items-center gap-1 bg-white rounded-xl p-1" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
             {(['NGN', 'USD'] as const).map(c => (
               <button
@@ -177,7 +232,8 @@ export default function PricingPage() {
         {/* Plan cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {PLANS.map(plan => {
-            const savings = yearlySavings(plan)
+            const { saving, monthsSaved } = yearlySavings(plan)
+            const cta = getPlanCTA(plan.key)
             return (
               <div
                 key={plan.key}
@@ -203,9 +259,9 @@ export default function PricingPage() {
                         <span className="text-sm text-gray-400">/{billingInterval === 'monthly' ? 'mo' : 'yr'}</span>
                       )}
                     </div>
-                    {billingInterval === 'yearly' && savings > 0 && (
+                    {billingInterval === 'yearly' && saving > 0 && (
                       <span className="inline-block mt-1.5 text-xs font-medium text-brand bg-brand/8 px-2 py-0.5 rounded-full">
-                        Save {symbol}{savings.toLocaleString()}/year
+                        Save {symbol}{saving.toLocaleString()} · {monthsSaved} months free
                       </span>
                     )}
                   </div>
@@ -220,28 +276,51 @@ export default function PricingPage() {
                   ))}
                 </ul>
 
-                <Link
-                  href={plan.href}
-                  className={`block text-center py-2.5 rounded-xl text-sm font-semibold transition-colors ${
-                    plan.highlight
-                      ? 'bg-brand text-white hover:bg-brand-dark'
-                      : plan.key === 'starter'
-                      ? 'bg-gray-900 text-white hover:bg-gray-800'
-                      : 'border border-black/15 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {plan.cta}
-                </Link>
+                {cta.onClick ? (
+                  <button
+                    onClick={cta.onClick}
+                    disabled={cta.disabled || authLoading}
+                    className={`block w-full text-center py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                      cta.isCurrent
+                        ? 'bg-gray-100 text-gray-400 cursor-default'
+                        : plan.highlight
+                        ? 'bg-brand text-white hover:bg-brand-dark'
+                        : 'border border-black/15 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {cta.label}
+                  </button>
+                ) : (
+                  <Link
+                    href={cta.href}
+                    className={`block text-center py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                      cta.isCurrent
+                        ? 'bg-gray-100 text-gray-400 pointer-events-none'
+                        : plan.key === 'starter'
+                        ? 'bg-gray-900 text-white hover:bg-gray-800'
+                        : plan.highlight
+                        ? 'bg-brand text-white hover:bg-brand-dark'
+                        : 'border border-black/15 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {cta.label}
+                  </Link>
+                )}
               </div>
             )
           })}
         </div>
 
-        {/* Footer note */}
         <p className="text-center text-sm text-gray-400 mt-10">
           All plans include a 14-day money-back guarantee. No questions asked. · Powered by Paystack.
         </p>
       </main>
+
+      <UpgradeModal
+        isOpen={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        reason="upgrade"
+      />
     </div>
   )
 }

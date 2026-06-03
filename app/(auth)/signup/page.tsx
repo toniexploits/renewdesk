@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const planParam = searchParams.get('plan')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -49,7 +51,10 @@ export default function SignupPage() {
 
     // If a session exists, email confirmation is disabled — go straight to dashboard
     if (data.session) {
-      router.push('/dashboard')
+      const dest = planParam === 'pro' || planParam === 'agency'
+        ? `/dashboard?upgrade=${planParam}`
+        : '/dashboard'
+      router.push(dest)
       router.refresh()
       return
     }
@@ -207,5 +212,13 @@ export default function SignupPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupForm />
+    </Suspense>
   )
 }
