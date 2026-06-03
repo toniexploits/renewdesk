@@ -9,7 +9,7 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: 'RenewDesk',
-  description: 'Client renewal reminder and invoice manager for freelancers and agencies',
+  description: 'Client renewal reminder, quote and invoice manager for freelancers and agencies',
 }
 
 export default function RootLayout({
