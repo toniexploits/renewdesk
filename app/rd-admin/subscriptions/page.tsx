@@ -106,6 +106,7 @@ export default async function AdminSubscriptionsPage() {
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100">
@@ -150,6 +151,7 @@ export default async function AdminSubscriptionsPage() {
             })}
           </tbody>
         </table>
+        </div>
         {(!subs || subs.length === 0) && (
           <div className="py-12 text-center text-gray-400 text-sm">No subscriptions yet.</div>
         )}
