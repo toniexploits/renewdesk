@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { formatAmount } from '@/lib/format'
+import DropdownPortal from '@/components/DropdownPortal'
 
 export interface AdminUser {
   id: string
@@ -70,16 +71,8 @@ function ActionMenu({
 }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
   const isSelf = user.id === currentUserId
-
-  useEffect(() => {
-    function h(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
 
   async function changeRole(newRole: string) {
     setLoading(true)
@@ -111,8 +104,9 @@ function ActionMenu({
   }
 
   return (
-    <div className="relative" ref={ref}>
+    <div>
       <button
+        ref={btnRef}
         onClick={() => setOpen(v => !v)}
         disabled={loading}
         className="p-1.5 rounded hover:bg-black/5 transition-colors text-gray-400 hover:text-gray-600"
@@ -122,9 +116,9 @@ function ActionMenu({
           <circle cx="12" cy="5"  r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
         </svg>
       </button>
-      {open && (
+      <DropdownPortal isOpen={open} anchorRef={btnRef} onClose={() => setOpen(false)}>
         <div
-          className="absolute right-0 mt-1 w-48 bg-white rounded-lg py-1 z-50"
+          className="bg-white rounded-lg py-1"
           style={{ border: '1px solid rgba(0,0,0,0.10)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
         >
           <button
@@ -167,7 +161,7 @@ function ActionMenu({
             </>
           )}
         </div>
-      )}
+      </DropdownPortal>
     </div>
   )
 }

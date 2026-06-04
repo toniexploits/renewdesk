@@ -100,7 +100,7 @@ export default function Sidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex fixed left-0 top-0 h-full w-56 bg-[#1a1a18] flex-col z-20">
+      <aside className="hidden md:flex fixed left-0 top-0 h-full w-56 flex-col z-20" style={{ background: '#1a1a18' }}>
         {/* Logo */}
         <div className="px-4 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
           <div className="flex items-center gap-3">
