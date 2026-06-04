@@ -204,7 +204,7 @@ export default function AdminSidebar({ displayName, role, initials }: Props) {
       </header>
 
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 flex-col z-20">
+      <aside className="hidden md:flex fixed left-0 top-14 bottom-0 w-64 flex-col z-20">
         <SidebarContent />
       </aside>
 
