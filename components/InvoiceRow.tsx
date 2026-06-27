@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Invoice, InvoiceStatus, Profile } from '@/lib/types'
 import { formatAmount } from '@/lib/format'
 import StatusBadge from '@/components/StatusBadge'
-import { generatePDF, invoiceToPDFData } from '@/lib/generatePDF'
+import { generatePDF, invoiceToPDFData, fetchLogoDataUrl } from '@/lib/generatePDF'
 import DropdownPortal from '@/components/DropdownPortal'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -270,6 +270,13 @@ export default function InvoiceRow({
 }: InvoiceRowProps) {
   const supabase = createClient()
 
+  const [logoDataUrl, setLogoDataUrl] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    if (profile?.logo_url) {
+      fetchLogoDataUrl(profile.logo_url).then(setLogoDataUrl)
+    }
+  }, [profile?.logo_url])
+
   const [actionLoading, setActionLoading] = useState<ActionType | null>(null)
   const [actionSuccess, setActionSuccess] = useState<ActionType | null>(null)
   const [actionError, setActionError] = useState<{ type: ActionType; message: string } | null>(null)
@@ -330,7 +337,7 @@ export default function InvoiceRow({
     setActionError(null)
     setMenuOpen(false)
     try {
-      const pdfData = invoiceToPDFData(invoice, profile)
+      const pdfData = invoiceToPDFData(invoice, profile, logoDataUrl)
       const doc = generatePDF(pdfData)
       const slug = (invoice.client_name || 'Client').replace(/[^a-zA-Z0-9]/g, '_')
       doc.save(`${invoice.inv_number}-${slug}.pdf`)
@@ -353,7 +360,7 @@ export default function InvoiceRow({
     let pdfUrl = ''
 
     try {
-      const pdfData = invoiceToPDFData(invoice, profile)
+      const pdfData = invoiceToPDFData(invoice, profile, logoDataUrl)
       const doc = generatePDF(pdfData)
       const blob = doc.output('blob')
 
@@ -450,7 +457,7 @@ export default function InvoiceRow({
     setMenuOpen(false)
 
     try {
-      const pdfData = invoiceToPDFData(invoice, profile)
+      const pdfData = invoiceToPDFData(invoice, profile, logoDataUrl)
       const doc = generatePDF(pdfData)
       const pdfBase64 = doc.output('datauristring').split(',')[1]
 

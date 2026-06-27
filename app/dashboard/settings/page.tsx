@@ -69,6 +69,10 @@ export default function SettingsPage() {
     tax_rate: 7.5,
   })
 
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [logoUploading, setLogoUploading] = useState(false)
+  const [logoFeedback, setLogoFeedback] = useState<string | null>(null)
+
   const [accounts, setAccounts] = useState<BankAccount[]>([])
   const [subscription, setSubscription] = useState<UserSubscription | null>(null)
   const [usage, setUsage] = useState<{ invoices_created: number; quotes_created: number } | null>(null)
@@ -113,6 +117,7 @@ export default function SettingsPage() {
           currency: profileRes.data.currency ?? 'NGN',
           tax_rate: profileRes.data.tax_rate ?? 7.5,
         })
+        setLogoUrl(profileRes.data.logo_url ?? null)
         setBillingCurrencyState(profileRes.data.billing_currency ?? 'NGN')
       }
       if (accountsRes.data) setAccounts(accountsRes.data as BankAccount[])
@@ -163,6 +168,62 @@ export default function SettingsPage() {
       setFeedback({ type: 'error', message: 'An unexpected error occurred.' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleLogoUpload(file: File) {
+    if (!userId) return
+    if (file.size > 2 * 1024 * 1024) { setLogoFeedback('Logo must be under 2 MB.'); return }
+    if (!file.type.startsWith('image/')) { setLogoFeedback('Only image files are allowed.'); return }
+
+    setLogoUploading(true)
+    setLogoFeedback(null)
+    const supabase = createClient()
+
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'png'
+      const path = `logos/${userId}.${ext}`
+      const { error: uploadErr } = await supabase.storage
+        .from('invoices')
+        .upload(path, file, { contentType: file.type, upsert: true })
+      if (uploadErr) { setLogoFeedback(uploadErr.message); return }
+
+      const { data: urlData } = supabase.storage.from('invoices').getPublicUrl(path)
+      const publicUrl = urlData?.publicUrl ?? null
+
+      const { error: updateErr } = await supabase
+        .from('profiles')
+        .update({ logo_url: publicUrl, updated_at: new Date().toISOString() })
+        .eq('id', userId)
+      if (updateErr) { setLogoFeedback(updateErr.message); return }
+
+      setLogoUrl(publicUrl)
+      setLogoFeedback('Logo uploaded.')
+    } catch {
+      setLogoFeedback('Upload failed. Please try again.')
+    } finally {
+      setLogoUploading(false)
+    }
+  }
+
+  async function handleLogoRemove() {
+    if (!userId || !logoUrl) return
+    setLogoUploading(true)
+    setLogoFeedback(null)
+    const supabase = createClient()
+
+    try {
+      const path = logoUrl.split('/invoices/')[1]
+      if (path) await supabase.storage.from('invoices').remove([path])
+      await supabase
+        .from('profiles')
+        .update({ logo_url: null, updated_at: new Date().toISOString() })
+        .eq('id', userId)
+      setLogoUrl(null)
+    } catch {
+      setLogoFeedback('Could not remove logo.')
+    } finally {
+      setLogoUploading(false)
     }
   }
 
@@ -415,6 +476,62 @@ export default function SettingsPage() {
                     onChange={(e) => setProfileField('tax_rate', Number(e.target.value))}
                   />
                 </Field>
+              </div>
+
+              {/* Brand logo */}
+              <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                <p className="text-xs font-medium text-gray-500 mb-3">Brand logo</p>
+                <div className="flex items-center gap-4 flex-wrap">
+                  {logoUrl && (
+                    <div
+                      className="flex items-center justify-center rounded-lg overflow-hidden bg-gray-50"
+                      style={{ width: 96, height: 48, border: '1px solid rgba(0,0,0,0.08)' }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={logoUrl} alt="Business logo" className="max-w-full max-h-full object-contain" />
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-2">
+                    <label className="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors" style={{ border: '1px solid rgba(0,0,0,0.1)' }}>
+                      {logoUploading ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                          Uploading…
+                        </>
+                      ) : (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                          </svg>
+                          {logoUrl ? 'Change logo' : 'Upload logo'}
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        className="hidden"
+                        disabled={logoUploading}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = '' }}
+                      />
+                    </label>
+                    {logoUrl && (
+                      <button
+                        type="button"
+                        disabled={logoUploading}
+                        onClick={handleLogoRemove}
+                        className="text-xs text-red-500 hover:text-red-600 text-left disabled:opacity-50"
+                      >
+                        Remove logo
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 w-full">Shown in invoice PDFs. PNG or JPG, max 2 MB.</p>
+                  {logoFeedback && (
+                    <p className={`text-xs w-full ${logoFeedback === 'Logo uploaded.' ? 'text-brand' : 'text-red-600'}`}>
+                      {logoFeedback}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 

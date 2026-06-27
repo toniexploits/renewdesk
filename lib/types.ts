@@ -20,6 +20,7 @@ export interface Profile {
   bank_country: string
   swift_code: string | null
   iban: string | null
+  logo_url: string | null
   created_at: string
   updated_at: string
 }

@@ -20,6 +20,79 @@ function pdfAmount(amount: number, currency: string): string {
   return prefix + Number(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
+// ─── Number to words ─────────────────────────────────────────────────────────
+
+const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+  'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen',
+  'Eighteen', 'Nineteen']
+const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+
+function below1000(n: number): string {
+  if (n === 0) return ''
+  if (n < 20) return ONES[n]
+  if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? ' ' + ONES[n % 10] : '')
+  return ONES[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' ' + below1000(n % 100) : '')
+}
+
+function convertToWords(n: number): string {
+  if (n === 0) return 'Zero'
+  const parts: string[] = []
+  if (n >= 1_000_000_000) { parts.push(below1000(Math.floor(n / 1_000_000_000)) + ' Billion'); n %= 1_000_000_000 }
+  if (n >= 1_000_000)     { parts.push(below1000(Math.floor(n / 1_000_000)) + ' Million');     n %= 1_000_000 }
+  if (n >= 1_000)         { parts.push(below1000(Math.floor(n / 1_000)) + ' Thousand');        n %= 1_000 }
+  if (n > 0) parts.push(below1000(n))
+  return parts.join(' ')
+}
+
+// [singular-main, plural-main, singular-sub, plural-sub]
+const CURRENCY_WORDS: Record<string, [string, string, string, string]> = {
+  NGN: ['Naira', 'Naira', 'Kobo', 'Kobo'],
+  USD: ['Dollar', 'Dollars', 'Cent', 'Cents'],
+  GBP: ['Pound', 'Pounds', 'Penny', 'Pence'],
+  EUR: ['Euro', 'Euros', 'Cent', 'Cents'],
+  KES: ['Shilling', 'Shillings', 'Cent', 'Cents'],
+  GHS: ['Cedi', 'Cedis', 'Pesewa', 'Pesewas'],
+  ZAR: ['Rand', 'Rand', 'Cent', 'Cents'],
+}
+
+function numberToWords(amount: number, currency: string): string {
+  const [ms, mp, ss, sp] = CURRENCY_WORDS[currency] ?? ['Unit', 'Units', 'Cent', 'Cents']
+  const rounded = Math.round(amount * 100)
+  const mainAmt = Math.floor(rounded / 100)
+  const subAmt  = rounded % 100
+  const mainStr = `${convertToWords(mainAmt)} ${mainAmt === 1 ? ms : mp}`
+  if (subAmt === 0) return `${mainStr} Only`
+  return `${mainStr} and ${convertToWords(subAmt)} ${subAmt === 1 ? ss : sp} Only`
+}
+
+// ─── Logo loader (browser-only) ───────────────────────────────────────────────
+
+function getImageFormat(dataUrl: string): string {
+  const m = dataUrl.match(/^data:image\/(\w+);/)
+  const t = m?.[1]?.toLowerCase()
+  if (t === 'jpeg' || t === 'jpg') return 'JPEG'
+  if (t === 'png') return 'PNG'
+  if (t === 'gif') return 'GIF'
+  if (t === 'webp') return 'WEBP'
+  return 'JPEG'
+}
+
+export async function fetchLogoDataUrl(url: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return undefined
+    const blob = await res.blob()
+    return await new Promise<string>((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.onerror   = () => resolve(undefined as unknown as string)
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return undefined
+  }
+}
+
 // ─── Data interface ───────────────────────────────────────────────────────────
 
 export interface InvoicePDFData {
@@ -52,6 +125,10 @@ export interface InvoicePDFData {
   /** ISO timestamp for when the invoice was paid. Used as the "Payment date"
    *  on receipts. Falls back to updated_at when null. */
   paymentDate?: string
+  /** Optional notes shown at the bottom of the invoice. */
+  notes?: string
+  /** Base64 data URL of the business logo, pre-fetched by the caller. */
+  logoDataUrl?: string
 }
 
 // ─── Generator ────────────────────────────────────────────────────────────────
@@ -107,22 +184,34 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
     doc.text(svcLabel, margin, y + 15)
   }
 
+  // Logo (right-aligned, max 36mm wide × 14mm tall)
+  const LOGO_W = 36
+  const LOGO_H = 14
+  let logoOffset = 0
+  if (data.logoDataUrl) {
+    try {
+      const fmt = getImageFormat(data.logoDataUrl)
+      doc.addImage(data.logoDataUrl, fmt, rightEdge - LOGO_W, y, LOGO_W, LOGO_H)
+      logoOffset = LOGO_H + 3
+    } catch { /* ignore logo errors */ }
+  }
+
   // Business info — right aligned
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(11)
   doc.setTextColor(26, 26, 24)
-  doc.text(data.bizName || 'Your Business', rightEdge, y + 6, { align: 'right' })
+  doc.text(data.bizName || 'Your Business', rightEdge, y + 6 + logoOffset, { align: 'right' })
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(107, 107, 103)
-  if (data.bizEmail) doc.text(data.bizEmail, rightEdge, y + 12, { align: 'right' })
-  doc.text(`${numberLabel} ${data.invNumber}`, rightEdge, y + 19, { align: 'right' })
-  doc.text(`Issued: ${today}`, rightEdge, y + 25, { align: 'right' })
-  doc.text(`${dateLabel}: ${bottomDateText}`, rightEdge, y + 31, { align: 'right' })
+  if (data.bizEmail) doc.text(data.bizEmail, rightEdge, y + 12 + logoOffset, { align: 'right' })
+  doc.text(`${numberLabel} ${data.invNumber}`, rightEdge, y + 19 + logoOffset, { align: 'right' })
+  doc.text(`Issued: ${today}`, rightEdge, y + 25 + logoOffset, { align: 'right' })
+  doc.text(`${dateLabel}: ${bottomDateText}`, rightEdge, y + 31 + logoOffset, { align: 'right' })
 
   // Status badge
-  const badgeY = y + 39
+  const badgeY = y + 39 + logoOffset
   if (isPaid) {
     doc.setFillColor(225, 245, 238)   // #E1F5EE
     doc.roundedRect(rightEdge - 56, badgeY - 4, 56, 7, 1.5, 1.5, 'F')
@@ -139,7 +228,7 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
     doc.text('Pending payment', rightEdge - 26, badgeY + 0.5, { align: 'center' })
   }
 
-  y += 48
+  y += 48 + logoOffset
 
   // ── Divider ──────────────────────────────────────────────────────────────────
   doc.setDrawColor(0, 0, 0)
@@ -251,7 +340,14 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
   doc.setTextColor(26, 26, 24)
   doc.text(totalLabel, totalsLabelX, y)
   doc.text(pdfAmount(data.grand, data.currency), colAmt, y, { align: 'right' })
-  y += 12
+  y += 6
+
+  // Total in words
+  doc.setFont('helvetica', 'italic')
+  doc.setFontSize(8)
+  doc.setTextColor(107, 107, 103)
+  doc.text(numberToWords(data.grand, data.currency), totalsLabelX, y)
+  y += 10
 
   // ── Payment details ───────────────────────────────────────────────────────────
   const hasBankDetails = data.bankName || data.accountName || data.accountNumber
@@ -293,6 +389,27 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
     }
   }
 
+  // ── Notes ─────────────────────────────────────────────────────────────────────
+  if (data.notes) {
+    doc.setDrawColor(0, 0, 0)
+    doc.setLineWidth(0.2)
+    doc.line(margin, y, rightEdge, y)
+    y += 7
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(158, 158, 153)
+    doc.text('NOTES', margin, y)
+    y += 5
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(26, 26, 24)
+    const noteLines = doc.splitTextToSize(data.notes, rightEdge - margin)
+    doc.text(noteLines, margin, y)
+    y += noteLines.length * 5 + 5
+  }
+
   // ── Footer ────────────────────────────────────────────────────────────────────
   if (!data.removeBranding) {
     doc.setFont('helvetica', 'normal')
@@ -312,7 +429,7 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
 
 // ─── Convenience: build InvoicePDFData from a saved Invoice + Profile ────────
 
-export function invoiceToPDFData(invoice: Invoice, profile: Profile | null): InvoicePDFData {
+export function invoiceToPDFData(invoice: Invoice, profile: Profile | null, logoDataUrl?: string): InvoicePDFData {
   const inv = invoice as Invoice & { payment_date?: string | null }
   const snap = invoice.bank_details_snapshot
 
@@ -355,5 +472,7 @@ export function invoiceToPDFData(invoice: Invoice, profile: Profile | null): Inv
     iban,
     status: invoice.status,
     paymentDate: inv.payment_date ?? invoice.updated_at ?? undefined,
+    notes: invoice.notes ?? undefined,
+    logoDataUrl,
   }
 }

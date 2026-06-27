@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatAmount, CURRENCY_OPTIONS } from '@/lib/format'
-import { generatePDF } from '@/lib/generatePDF'
+import { generatePDF, fetchLogoDataUrl } from '@/lib/generatePDF'
 import type { Profile, Invoice, LineItem, BankAccount, BankDetailsSnapshot } from '@/lib/types'
 import type { UsageResult } from '@/lib/usageLimits'
 import BankAccountSelector, {
@@ -437,6 +437,13 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts, usage }
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
+  const [logoDataUrl, setLogoDataUrl] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    if (profile?.logo_url) {
+      fetchLogoDataUrl(profile.logo_url).then(setLogoDataUrl)
+    }
+  }, [profile?.logo_url])
+
   // Computed totals
   const subtotal = useMemo(() => items.reduce((s, i) => s + i.qty * i.price, 0), [items])
   const taxAmount = useMemo(() => (subtotal * form.taxRate) / 100, [subtotal, form.taxRate])
@@ -467,6 +474,8 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts, usage }
       bankCountry: snap?.bank_country || undefined,
       swiftCode: snap?.swift_code || undefined,
       iban: snap?.iban || undefined,
+      notes: form.clientNotes || undefined,
+      logoDataUrl,
     }
   }
 
