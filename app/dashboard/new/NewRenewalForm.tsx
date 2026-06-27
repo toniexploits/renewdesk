@@ -605,9 +605,9 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts, usage }
     const dueFmt = form.renewalDate
       ? new Date(form.renewalDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
       : ''
-    const biz = form.bizName || 'us'
-    const svc = form.serviceName || 'your service'
-    const plan = form.servicePlan ? ` (${form.servicePlan})` : ''
+    const biz = (form.bizName || 'us').trim()
+    const svc = (form.serviceName || 'your service').trim()
+    const plan = form.servicePlan ? ` (${form.servicePlan.trim()})` : ''
 
     let pdfUrl = ''
 

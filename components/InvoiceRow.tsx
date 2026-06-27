@@ -390,9 +390,9 @@ export default function InvoiceRow({
           day: '2-digit', month: 'short', year: 'numeric',
         })
       : ''
-    const biz = profile?.business_name || 'us'
-    const svc = invoice.service_name || 'your service'
-    const plan = invoice.service_plan ? ` (${invoice.service_plan})` : ''
+    const biz = (profile?.business_name || 'us').trim()
+    const svc = (invoice.service_name || 'your service').trim()
+    const plan = invoice.service_plan ? ` (${invoice.service_plan.trim()})` : ''
 
     const invForPaid = invoice as Invoice & { payment_date?: string | null }
     const paidDateSource = invForPaid.payment_date ?? invoice.updated_at
