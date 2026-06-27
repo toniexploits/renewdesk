@@ -182,7 +182,7 @@ export default function SettingsPage() {
 
     try {
       const ext = file.name.split('.').pop()?.toLowerCase() || 'png'
-      const path = `logos/${userId}.${ext}`
+      const path = `${userId}/logo.${ext}`
       const { error: uploadErr } = await supabase.storage
         .from('invoices')
         .upload(path, file, { contentType: file.type, upsert: true })
