@@ -86,12 +86,14 @@ export default function QuotesPage() {
 
   const filtered = activeTab === 'all' ? quotes : quotes.filter((q) => q.status === activeTab)
 
-  const currency = quotes[0]?.currency ?? 'NGN'
+  const currency = profile?.currency ?? 'NGN'
 
-  // Stats
+  // Stats — pipeline only sums quotes in the profile currency to avoid mixing currencies
   const now           = new Date()
   const active_quotes = quotes.filter((q) => q.status === 'sent' || q.status === 'approved')
-  const pipeline      = active_quotes.reduce((s, q) => s + q.total, 0)
+  const pipeline      = active_quotes
+    .filter((q) => (q.currency ?? 'NGN') === currency)
+    .reduce((s, q) => s + q.total, 0)
   const converted     = quotes.filter((q) => q.status === 'converted').length
   const expired       = quotes.filter(
     (q) => q.valid_until && new Date(q.valid_until + 'T23:59:59') < now && q.status !== 'converted'

@@ -94,14 +94,15 @@ export default function InvoicesPage() {
 
   const filtered = activeTab === 'all' ? invoices : invoices.filter((i) => i.status === activeTab)
 
-  const currency = invoices[0]?.currency ?? 'NGN'
+  const currency = profile?.currency ?? 'NGN'
 
-  // Exclude drafts from financial metrics
+  // Exclude drafts from financial metrics; only sum invoices in the profile currency
   const activeInvoices = invoices.filter((i) => i.status !== 'draft')
-  const outstanding = activeInvoices
+  const activeInCurrency = activeInvoices.filter((i) => (i.currency ?? 'NGN') === currency)
+  const outstanding = activeInCurrency
     .filter((i) => i.status === 'pending' || i.status === 'overdue')
     .reduce((s, i) => s + i.total, 0)
-  const collected = activeInvoices
+  const collected = activeInCurrency
     .filter((i) => i.status === 'paid')
     .reduce((s, i) => s + i.total, 0)
   const overdueCount = activeInvoices.filter((i) => i.status === 'overdue').length
