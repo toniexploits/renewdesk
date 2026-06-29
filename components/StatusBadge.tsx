@@ -6,6 +6,7 @@ const statusStyles: Record<AnyStatus, string> = {
   // Invoice
   draft:     'bg-[#EFF6FF] text-[#1D4ED8]',
   pending:   'bg-amber-100 text-amber-800',
+  partial:   'bg-sky-100 text-sky-700',
   paid:      'bg-[#E1F5EE] text-[#085041]',
   overdue:   'bg-red-100 text-red-700',
   cancelled: 'bg-gray-100 text-gray-500',
@@ -19,6 +20,7 @@ const statusStyles: Record<AnyStatus, string> = {
 const statusLabels: Record<AnyStatus, string> = {
   draft:     'Draft',
   pending:   'Pending',
+  partial:   'Part paid',
   paid:      'Paid',
   overdue:   'Overdue',
   cancelled: 'Cancelled',

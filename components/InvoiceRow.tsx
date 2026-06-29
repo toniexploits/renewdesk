@@ -3,11 +3,12 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import type { Invoice, InvoiceStatus, Profile } from '@/lib/types'
+import type { Invoice, InvoiceStatus, Payment, Profile } from '@/lib/types'
 import { formatAmount } from '@/lib/format'
 import StatusBadge from '@/components/StatusBadge'
 import { generatePDF, invoiceToPDFData, fetchLogoDataUrl } from '@/lib/generatePDF'
 import DropdownPortal from '@/components/DropdownPortal'
+import RecordPaymentModal from '@/components/RecordPaymentModal'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,7 @@ interface InvoiceRowProps {
   readonly?: boolean
   onDelete?: (id: string) => void
   onStatusChange?: (id: string, status: InvoiceStatus) => void
+  onUpdate?: (id: string, updates: Partial<Invoice>) => void
 }
 
 type ActionType = 'pdf' | 'whatsapp' | 'email'
@@ -112,6 +114,7 @@ function SpinnerIcon({ size = 14, color }: { size?: number; color: string }) {
 const STATUS_DOT_COLORS: Record<InvoiceStatus, string> = {
   draft:     '#3b82f6',
   pending:   '#f59e0b',
+  partial:   '#0ea5e9',
   paid:      '#1D9E75',
   overdue:   '#ef4444',
   cancelled: '#9ca3af',
@@ -257,7 +260,7 @@ function MenuDivider() {
 
 // ─── Status options ───────────────────────────────────────────────────────────
 
-const STATUS_OPTIONS: InvoiceStatus[] = ['draft', 'pending', 'paid', 'overdue', 'cancelled']
+const STATUS_OPTIONS: InvoiceStatus[] = ['draft', 'pending', 'partial', 'paid', 'overdue', 'cancelled']
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -267,6 +270,7 @@ export default function InvoiceRow({
   readonly = false,
   onDelete,
   onStatusChange,
+  onUpdate,
 }: InvoiceRowProps) {
   const supabase = createClient()
 
@@ -292,6 +296,14 @@ export default function InvoiceRow({
 
   // Persistent toast shown after marking paid, with quick actions
   const [paidActionToast, setPaidActionToast] = useState(false)
+
+  // Record payment modal + post-payment receipt toast
+  const [showRecordPayment, setShowRecordPayment] = useState(false)
+  const [paymentReceiptData, setPaymentReceiptData] = useState<{
+    payment: Payment
+    newAmountPaid: number
+    isFullyPaid: boolean
+  } | null>(null)
 
   // Close when another row opens its menu
   useEffect(() => {
@@ -326,8 +338,10 @@ export default function InvoiceRow({
 
   const anyLoading = actionLoading !== null
   const anyBusy = anyLoading || duplicateLoading
-  const isDraft = invoice.status === 'draft'
-  const isPaid = invoice.status === 'paid'
+  const isDraft    = invoice.status === 'draft'
+  const isPaid     = invoice.status === 'paid'
+  const isPartial  = invoice.status === 'partial'
+  const canRecordPayment = !isDraft && !isPaid && !readonly && invoice.status !== 'cancelled'
 
   // ── PDF handler ──────────────────────────────────────────────────────────────
 
@@ -579,18 +593,51 @@ export default function InvoiceRow({
     const nowIso = new Date().toISOString()
     const { error } = await supabase
       .from('invoices')
-      .update({ status: 'paid', payment_date: nowIso, updated_at: nowIso })
+      .update({ status: 'paid', payment_date: nowIso, updated_at: nowIso, amount_paid: invoice.total })
       .eq('id', invoice.id)
     setPaidConfirmLoading(false)
     if (!error) {
-      // Optimistic update — parent re-renders the row as paid immediately
-      if (onStatusChange) onStatusChange(invoice.id, 'paid')
+      if (onUpdate) {
+        onUpdate(invoice.id, { status: 'paid', amount_paid: invoice.total })
+      } else if (onStatusChange) {
+        onStatusChange(invoice.id, 'paid')
+      }
       setShowPaidConfirm(false)
       setPaidActionToast(true)
     } else {
       showToast(`Mark as paid failed: ${error.message}`, false)
       setShowPaidConfirm(false)
     }
+  }
+
+  function handleRecordPaymentSuccess(payment: Payment, newAmountPaid: number, isFullyPaid: boolean) {
+    setShowRecordPayment(false)
+    const newStatus: InvoiceStatus = isFullyPaid ? 'paid' : 'partial'
+    if (onUpdate) {
+      onUpdate(invoice.id, { status: newStatus, amount_paid: newAmountPaid })
+    } else if (onStatusChange) {
+      onStatusChange(invoice.id, newStatus)
+    }
+    setPaymentReceiptData({ payment, newAmountPaid, isFullyPaid })
+  }
+
+  function handleDownloadPartialReceipt() {
+    if (!paymentReceiptData) return
+    const { payment, newAmountPaid, isFullyPaid } = paymentReceiptData
+    const updatedInvoice: Invoice = {
+      ...invoice,
+      status: isFullyPaid ? 'paid' : 'partial',
+      amount_paid: newAmountPaid,
+    }
+    const pdfData = invoiceToPDFData(updatedInvoice, profile, logoDataUrl, {
+      amountThisPayment: payment.amount,
+      totalAmountPaid:   newAmountPaid,
+      balanceRemaining:  Math.max(0, invoice.total - newAmountPaid),
+      paymentDate:       payment.payment_date,
+    })
+    const doc = generatePDF(pdfData)
+    doc.save(`${invoice.inv_number}-receipt-${payment.id.slice(0, 8)}.pdf`)
+    setPaymentReceiptData(null)
   }
 
   async function handleDelete() {
@@ -600,6 +647,8 @@ export default function InvoiceRow({
   }
 
   // ── Derived values ────────────────────────────────────────────────────────────
+
+  const balance = isPartial ? invoice.total - (invoice.amount_paid ?? 0) : 0
 
   const invWithPayment = invoice as Invoice & { payment_date?: string | null }
   const paidDateSource = isPaid ? (invWithPayment.payment_date ?? invoice.updated_at) : null
@@ -660,9 +709,8 @@ export default function InvoiceRow({
             <span className={`text-[12px] font-medium mt-px tabular-nums ${isDraft ? 'text-blue-400' : 'text-gray-400'}`}>
               {invoice.inv_number}
             </span>
-            {isPaid && (
-              <span className="text-[10px] font-medium text-gray-400 leading-tight">Receipt</span>
-            )}
+            {isPaid    && <span className="text-[10px] font-medium text-gray-400 leading-tight">Receipt</span>}
+            {isPartial && <span className="text-[10px] font-medium text-sky-600 leading-tight">Balance: {formatAmount(balance, invoice.currency ?? 'NGN')}</span>}
           </div>
 
           <div
@@ -767,10 +815,23 @@ export default function InvoiceRow({
                       </span>
                     </Link>
 
+                    {/* Record payment */}
+                    {canRecordPayment && (
+                      <>
+                        <MenuDivider />
+                        <DropdownItem
+                          icon={<CheckIcon size={15} />}
+                          label="Record payment"
+                          iconColor="#0ea5e9"
+                          onClick={() => { setMenuOpen(false); setShowRecordPayment(true) }}
+                        />
+                      </>
+                    )}
+
                     <MenuDivider />
 
-                    {/* Status options — non-current statuses */}
-                    {STATUS_OPTIONS.filter((s) => s !== invoice.status).map((s) => (
+                    {/* Status options — non-current, exclude partial (system-managed) */}
+                    {STATUS_OPTIONS.filter((s) => s !== invoice.status && s !== 'partial').map((s) => (
                       <button
                         key={s}
                         className="w-full flex items-center gap-3 px-4 text-left hover:bg-gray-50 transition-colors"
@@ -841,7 +902,8 @@ export default function InvoiceRow({
           <p className="font-semibold text-gray-900 text-sm truncate">{invoice.client_name}</p>
           <p className="text-xs text-gray-400 mt-0.5 truncate">
             {[invoice.service_name, invoice.inv_number].filter(Boolean).join(' · ')}
-            {isPaid && <span className="ml-1.5 text-[10px] text-gray-400">· Receipt</span>}
+            {isPaid    && <span className="ml-1.5 text-[10px] text-gray-400">· Receipt</span>}
+            {isPartial && <span className="ml-1.5 text-[10px] text-sky-600">· Part paid</span>}
           </p>
         </div>
 
@@ -855,6 +917,11 @@ export default function InvoiceRow({
           <p className="text-sm font-semibold text-gray-900">
             {formatAmount(invoice.total, invoice.currency ?? 'NGN')}
           </p>
+          {isPartial && (
+            <p className="text-[10px] text-amber-600 mt-0.5 tabular-nums">
+              bal {formatAmount(balance, invoice.currency ?? 'NGN')}
+            </p>
+          )}
         </div>
 
         {/* Status */}
@@ -869,7 +936,7 @@ export default function InvoiceRow({
             >
               {STATUS_OPTIONS.map((s) => (
                 <option key={s} value={s}>
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                  {s === 'partial' ? 'Part paid' : s.charAt(0).toUpperCase() + s.slice(1)}
                 </option>
               ))}
             </select>
@@ -1033,6 +1100,75 @@ export default function InvoiceRow({
                 Confirm
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Record payment modal */}
+      {showRecordPayment && (
+        <RecordPaymentModal
+          invoice={invoice}
+          onClose={() => setShowRecordPayment(false)}
+          onSuccess={handleRecordPaymentSuccess}
+        />
+      )}
+
+      {/* Post-payment receipt toast */}
+      {paymentReceiptData && (
+        <div
+          className="fixed bottom-6 right-6 z-[210] bg-white rounded-xl px-4 py-3 max-w-sm"
+          style={{
+            border: '1px solid rgba(0,0,0,0.08)',
+            boxShadow: '0 12px 32px rgba(0,0,0,0.14)',
+            animation: 'toast-in 0.2s ease-out',
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: '#E0F2FE', color: '#0369A1' }}
+            >
+              <CheckIcon size={14} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900">
+                {paymentReceiptData.isFullyPaid
+                  ? 'Invoice fully paid — receipt ready'
+                  : `Payment recorded — ${formatAmount(paymentReceiptData.payment.amount, invoice.currency ?? 'NGN')} received`
+                }
+              </p>
+              {!paymentReceiptData.isFullyPaid && (
+                <p className="text-xs text-amber-600 mt-0.5">
+                  Balance: {formatAmount(invoice.total - paymentReceiptData.newAmountPaid, invoice.currency ?? 'NGN')}
+                </p>
+              )}
+              <div className="flex gap-2 mt-2.5">
+                <button
+                  onClick={handleDownloadPartialReceipt}
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-[#1a1a18] rounded-md hover:bg-[#2a2a26] flex items-center gap-1.5"
+                >
+                  <PdfIcon size={12} />
+                  Download receipt
+                </button>
+                <button
+                  onClick={() => {
+                    setPaymentReceiptData(null)
+                    if (invoice.client_email) handleEmail()
+                    else handleWhatsApp()
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-brand rounded-md hover:bg-brand-dark flex items-center gap-1.5"
+                >
+                  Send to client
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={() => setPaymentReceiptData(null)}
+              className="text-gray-300 hover:text-gray-500 text-base leading-none"
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
           </div>
         </div>
       )}

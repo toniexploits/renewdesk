@@ -129,6 +129,12 @@ export interface InvoicePDFData {
   notes?: string
   /** Base64 data URL of the business logo, pre-fetched by the caller. */
   logoDataUrl?: string
+  /** Set when generating a receipt for one specific payment instalment. */
+  amountThisPayment?: number
+  /** Running total paid across all instalments (including this one). */
+  totalAmountPaid?: number
+  /** Amount still outstanding after this payment. */
+  balanceRemaining?: number
 }
 
 // ─── Generator ────────────────────────────────────────────────────────────────
@@ -141,10 +147,14 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
   const rightEdge = pageWidth - margin
 
   const isPaid = data.status === 'paid'
-  const heading = isPaid ? 'Receipt' : 'Invoice'
-  const numberLabel = isPaid ? 'Receipt No.' : 'Invoice No.'
-  const totalLabel = isPaid ? 'Total paid' : 'Total due'
-  const dateLabel = isPaid ? 'Payment date' : 'Due'
+  // A receipt generated for one specific payment instalment
+  const isPaymentReceipt = typeof data.amountThisPayment === 'number'
+  const isFullPayment = isPaymentReceipt && (data.balanceRemaining ?? 0) <= 0.001
+
+  const heading = (isPaid || isPaymentReceipt) ? 'Receipt' : 'Invoice'
+  const numberLabel = (isPaid || isPaymentReceipt) ? 'Receipt No.' : 'Invoice No.'
+  const totalLabel = isPaid || isFullPayment ? 'Total paid' : 'Total due'
+  const dateLabel = (isPaid || isPaymentReceipt) ? 'Payment date' : 'Due'
 
   const today = new Date().toLocaleDateString('en-GB', {
     day: '2-digit',
@@ -153,7 +163,7 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
   })
 
   let bottomDateText: string
-  if (isPaid) {
+  if (isPaid || isPaymentReceipt) {
     const paid = data.paymentDate ? new Date(data.paymentDate) : null
     bottomDateText = paid
       ? paid.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -212,13 +222,20 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
 
   // Status badge
   const badgeY = y + 39 + logoOffset
-  if (isPaid) {
+  if (isPaid || isFullPayment) {
     doc.setFillColor(225, 245, 238)   // #E1F5EE
     doc.roundedRect(rightEdge - 56, badgeY - 4, 56, 7, 1.5, 1.5, 'F')
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(8)
     doc.setTextColor(8, 80, 65)       // #085041
     doc.text('Payment Received', rightEdge - 28, badgeY + 0.5, { align: 'center' })
+  } else if (isPaymentReceipt) {
+    doc.setFillColor(224, 242, 254)   // #E0F2FE sky-100
+    doc.roundedRect(rightEdge - 52, badgeY - 4, 52, 7, 1.5, 1.5, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(3, 105, 161)     // #0369A1 sky-700
+    doc.text('Part Payment', rightEdge - 26, badgeY + 0.5, { align: 'center' })
   } else {
     doc.setFillColor(254, 243, 199)   // #FEF3C7
     doc.roundedRect(rightEdge - 52, badgeY - 4, 52, 7, 1.5, 1.5, 'F')
@@ -389,6 +406,55 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
     }
   }
 
+  // ── Payment summary (partial / instalment receipts) ──────────────────────────
+  const hasPaymentSummary = data.amountThisPayment !== undefined || (data.totalAmountPaid !== undefined && (data.totalAmountPaid ?? 0) > 0)
+  if (hasPaymentSummary) {
+    doc.setDrawColor(0, 0, 0)
+    doc.setLineWidth(0.2)
+    doc.line(margin, y, rightEdge, y)
+    y += 7
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(158, 158, 153)
+    doc.text('PAYMENT SUMMARY', margin, y)
+    y += 5
+
+    doc.setFontSize(9)
+    doc.setTextColor(26, 26, 24)
+
+    if (data.amountThisPayment !== undefined) {
+      doc.setFont('helvetica', 'normal')
+      doc.text('This payment:', margin, y)
+      doc.text(pdfAmount(data.amountThisPayment, data.currency), rightEdge, y, { align: 'right' })
+      y += 6
+    }
+
+    if (data.totalAmountPaid !== undefined) {
+      doc.setFont('helvetica', 'normal')
+      doc.text('Total paid:', margin, y)
+      doc.text(pdfAmount(data.totalAmountPaid, data.currency), rightEdge, y, { align: 'right' })
+      y += 6
+    }
+
+    if (data.balanceRemaining !== undefined) {
+      const bal = Math.max(0, data.balanceRemaining)
+      doc.setFont('helvetica', 'bold')
+      if (bal > 0) {
+        doc.setTextColor(146, 64, 14)   // amber — balance outstanding
+        doc.text('Balance remaining:', margin, y)
+        doc.text(pdfAmount(bal, data.currency), rightEdge, y, { align: 'right' })
+      } else {
+        doc.setTextColor(29, 158, 117)  // brand green — fully paid
+        doc.text('Balance remaining:', margin, y)
+        doc.text(pdfAmount(0, data.currency), rightEdge, y, { align: 'right' })
+      }
+      doc.setTextColor(26, 26, 24)
+      doc.setFont('helvetica', 'normal')
+      y += 8
+    }
+  }
+
   // ── Notes ─────────────────────────────────────────────────────────────────────
   if (data.notes) {
     doc.setDrawColor(0, 0, 0)
@@ -429,7 +495,17 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
 
 // ─── Convenience: build InvoicePDFData from a saved Invoice + Profile ────────
 
-export function invoiceToPDFData(invoice: Invoice, profile: Profile | null, logoDataUrl?: string): InvoicePDFData {
+export function invoiceToPDFData(
+  invoice: Invoice,
+  profile: Profile | null,
+  logoDataUrl?: string,
+  paymentOverride?: {
+    amountThisPayment?: number
+    totalAmountPaid?: number
+    balanceRemaining?: number
+    paymentDate?: string
+  }
+): InvoicePDFData {
   const inv = invoice as Invoice & { payment_date?: string | null }
   const snap = invoice.bank_details_snapshot
 
@@ -474,5 +550,12 @@ export function invoiceToPDFData(invoice: Invoice, profile: Profile | null, logo
     paymentDate: inv.payment_date ?? invoice.updated_at ?? undefined,
     notes: invoice.notes ?? undefined,
     logoDataUrl,
+    // For partial invoices with no specific payment context, show running totals
+    ...(invoice.status === 'partial' ? {
+      totalAmountPaid: invoice.amount_paid,
+      balanceRemaining: invoice.total - invoice.amount_paid,
+    } : {}),
+    // Caller-supplied payment override wins over all defaults
+    ...paymentOverride,
   }
 }

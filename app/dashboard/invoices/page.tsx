@@ -13,6 +13,7 @@ const TABS: { key: FilterTab; label: string }[] = [
   { key: 'all',       label: 'All'       },
   { key: 'draft',     label: 'Draft'     },
   { key: 'pending',   label: 'Pending'   },
+  { key: 'partial',   label: 'Part paid' },
   { key: 'paid',      label: 'Paid'      },
   { key: 'overdue',   label: 'Overdue'   },
   { key: 'cancelled', label: 'Cancelled' },
@@ -87,6 +88,10 @@ export default function InvoicesPage() {
     setInvoices((prev) => prev.map((i) => (i.id === id ? { ...i, status } : i)))
   }
 
+  function handleInvoiceUpdate(id: string, updates: Partial<Invoice>) {
+    setInvoices((prev) => prev.map((i) => (i.id === id ? { ...i, ...updates } : i)))
+  }
+
   function countFor(tab: FilterTab) {
     if (tab === 'all') return invoices.length
     return invoices.filter((i) => i.status === tab).length
@@ -100,8 +105,12 @@ export default function InvoicesPage() {
   const activeInvoices = invoices.filter((i) => i.status !== 'draft')
   const activeInCurrency = activeInvoices.filter((i) => (i.currency ?? 'NGN') === currency)
   const outstanding = activeInCurrency
-    .filter((i) => i.status === 'pending' || i.status === 'overdue')
-    .reduce((s, i) => s + i.total, 0)
+    .filter((i) => i.status === 'pending' || i.status === 'overdue' || i.status === 'partial')
+    .reduce((s, i) => {
+      // For partial invoices use the remaining balance, not the full total
+      if (i.status === 'partial') return s + (i.total - (i.amount_paid ?? 0))
+      return s + i.total
+    }, 0)
   const collected = activeInCurrency
     .filter((i) => i.status === 'paid')
     .reduce((s, i) => s + i.total, 0)
@@ -250,6 +259,7 @@ export default function InvoicesPage() {
                 profile={profile}
                 onDelete={handleDelete}
                 onStatusChange={handleStatusChange}
+                onUpdate={handleInvoiceUpdate}
               />
             ))}
           </div>

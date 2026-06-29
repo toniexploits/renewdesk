@@ -51,7 +51,18 @@ export interface BankDetailsSnapshot {
   currency: string
 }
 
-export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled' | 'draft'
+export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled' | 'draft' | 'partial'
+
+export interface Payment {
+  id: string
+  invoice_id: string
+  user_id: string
+  amount: number
+  currency: string
+  payment_date: string
+  notes: string | null
+  created_at: string
+}
 
 export interface Invoice {
   id: string
@@ -73,6 +84,7 @@ export interface Invoice {
   status: InvoiceStatus
   notes: string | null
   payment_date: string | null
+  amount_paid: number
   bank_account_id: string | null
   bank_details_snapshot: BankDetailsSnapshot | null
   created_at: string
