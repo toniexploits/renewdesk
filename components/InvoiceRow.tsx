@@ -416,6 +416,9 @@ export default function InvoiceRow({
         })
       : ''
 
+    const amountPaid = invoice.amount_paid ?? 0
+    const balanceLeft = invoice.total - amountPaid
+
     const msg = isPaid
       ? [
           `Hello ${invoice.client_name || 'there'},`,
@@ -429,6 +432,27 @@ export default function InvoiceRow({
           `Thank you for your payment. It's a pleasure doing business with you!`,
           ``,
           pdfUrl ? `📎 Receipt PDF: ${pdfUrl}` : '',
+          ``,
+          `— ${biz}`,
+        ]
+          .join('\n')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim()
+      : isPartial
+      ? [
+          `Hello ${invoice.client_name || 'there'},`,
+          ``,
+          `Thank you for your partial payment to *${biz}*.`,
+          ``,
+          `🧾 *Invoice: ${invoice.inv_number}*`,
+          ``,
+          `💰 Amount paid: *${formatAmount(amountPaid, currency)}*`,
+          `💳 Balance remaining: *${formatAmount(balanceLeft, currency)}*`,
+          `📋 Invoice total: *${formatAmount(invoice.total, currency)}*`,
+          ``,
+          `Please arrange payment for the outstanding balance at your earliest convenience.`,
+          ``,
+          pdfUrl ? `📎 Invoice PDF: ${pdfUrl}` : '',
           ``,
           `— ${biz}`,
         ]
@@ -481,6 +505,7 @@ export default function InvoiceRow({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           isReceipt: isPaid,
+          isPartialReceipt: isPartial,
           invoiceData: {
             invNumber: invoice.inv_number,
             clientName: invoice.client_name,
@@ -496,6 +521,8 @@ export default function InvoiceRow({
             subtotal: invoice.subtotal,
             taxAmount: invoice.tax_amount,
             grand: invoice.total,
+            amountPaid: invoice.amount_paid ?? 0,
+            balance: invoice.total - (invoice.amount_paid ?? 0),
             bankName: profile?.bank_name ?? '',
             accountName: profile?.account_name ?? '',
             accountNumber: profile?.account_number ?? '',

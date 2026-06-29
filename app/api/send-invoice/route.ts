@@ -24,6 +24,8 @@ interface InvoiceData {
   subtotal: number
   taxAmount: number
   grand: number
+  amountPaid?: number      // for partial receipts
+  balance?: number         // for partial receipts
   bankName?: string
   accountName?: string
   accountNumber?: string
@@ -34,6 +36,7 @@ interface InvoiceData {
 interface SendInvoiceRequest {
   type?: 'invoice' | 'quote'
   isReceipt?: boolean
+  isPartialReceipt?: boolean
   invoiceData: InvoiceData
   recipientEmail: string
   pdfBase64: string
@@ -316,6 +319,134 @@ function buildReceiptEmailHtml(d: InvoiceData, recipientEmail: string): string {
 </html>`
 }
 
+// ─── Partial receipt email ────────────────────────────────────────────────────
+
+function buildPartialReceiptEmailHtml(d: InvoiceData, recipientEmail: string): string {
+  const today = new Date().toLocaleDateString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
+  })
+
+  const paymentDate = d.paymentDate
+    ? new Date(d.paymentDate).toLocaleDateString('en-GB', {
+        day: '2-digit', month: 'short', year: 'numeric',
+      })
+    : today
+
+  const svc = [d.serviceName, d.servicePlan].filter(Boolean).join(' — ')
+  const amountPaid = d.amountPaid ?? 0
+  const balance = d.balance ?? (d.grand - amountPaid)
+
+  const hasBankDetails = d.bankName || d.accountName || d.accountNumber
+  const bankSection = hasBankDetails
+    ? `
+    <div style="margin-top:24px;padding:16px;background:#f7f6f2;border-radius:8px;">
+      <p style="margin:0 0 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#9e9e99;">Pay remaining balance to</p>
+      ${d.bankName      ? `<p style="margin:0 0 4px;font-size:13px;color:#1a1a18;"><strong>Bank:</strong> ${d.bankName}</p>` : ''}
+      ${d.accountName   ? `<p style="margin:0 0 4px;font-size:13px;color:#1a1a18;"><strong>Account name:</strong> ${d.accountName}</p>` : ''}
+      ${d.accountNumber ? `<p style="margin:0 0 4px;font-size:13px;color:#1a1a18;"><strong>Account number:</strong> ${d.accountNumber}</p>` : ''}
+      ${d.swiftCode     ? `<p style="margin:0 0 4px;font-size:13px;color:#1a1a18;"><strong>SWIFT/BIC:</strong> ${d.swiftCode}</p>` : ''}
+      ${d.iban          ? `<p style="margin:0;font-size:13px;color:#1a1a18;"><strong>IBAN:</strong> ${d.iban}</p>` : ''}
+    </div>`
+    : ''
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Partial Payment Receipt ${d.invNumber}</title></head>
+<body style="margin:0;padding:0;background:#f7f6f2;font-family:'DM Sans',Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f6f2;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+
+        <!-- Header -->
+        <tr>
+          <td style="padding:0 0 24px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td><span style="font-size:20px;font-weight:700;color:#1D9E75;letter-spacing:-0.02em;">RenewDesk</span></td>
+                <td align="right"><span style="font-size:12px;color:#9e9e99;">${today}</span></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Partial Payment banner -->
+        <tr>
+          <td style="padding:0 0 12px;">
+            <div style="background:#FFF7ED;border-radius:10px;padding:14px 18px;border:1px solid #fed7aa;">
+              <p style="margin:0;font-size:13px;font-weight:700;color:#9a3412;">💰 Partial Payment Received</p>
+              <p style="margin:4px 0 0;font-size:12px;color:#9a3412;">${formatAmount(amountPaid, d.currency)} received on ${paymentDate} · Balance: ${formatAmount(balance, d.currency)}</p>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Receipt card -->
+        <tr>
+          <td style="background:#ffffff;border-radius:12px;border:1px solid rgba(0,0,0,0.08);box-shadow:0 1px 3px rgba(0,0,0,0.07),0 4px 16px rgba(0,0,0,0.04);overflow:hidden;">
+            <div style="background:#0ea5e9;padding:20px 24px;">
+              <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;font-family:Georgia,serif;">Partial Receipt</p>
+              ${svc ? `<p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.85);">${svc}</p>` : ''}
+            </div>
+            <div style="padding:24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+                <tr>
+                  <td style="padding-right:16px;">
+                    <p style="margin:0 0 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#9e9e99;">Invoice #</p>
+                    <p style="margin:0;font-size:14px;font-weight:600;color:#1a1a18;">${d.invNumber}</p>
+                  </td>
+                  <td>
+                    <p style="margin:0 0 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#9e9e99;">Payment date</p>
+                    <p style="margin:0;font-size:14px;font-weight:600;color:#1a1a18;">${paymentDate}</p>
+                  </td>
+                </tr>
+              </table>
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid #f0efeb;">
+                <tr>
+                  <td style="padding-right:16px;">
+                    <p style="margin:0 0 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#9e9e99;">From</p>
+                    <p style="margin:0;font-size:13px;color:#1a1a18;line-height:1.6;">${d.bizName || 'Your Business'}${d.bizEmail ? '<br/>' + d.bizEmail : ''}</p>
+                  </td>
+                  <td>
+                    <p style="margin:0 0 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#9e9e99;">Received from</p>
+                    <p style="margin:0;font-size:13px;color:#1a1a18;line-height:1.6;">${d.clientName || 'Client'}${recipientEmail ? '<br/>' + recipientEmail : ''}</p>
+                  </td>
+                </tr>
+              </table>
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:4px;">
+                <tr>
+                  <td style="padding:4px 12px;font-size:13px;color:#6b6b67;">Invoice total</td>
+                  <td style="padding:4px 12px;font-size:13px;color:#6b6b67;text-align:right;">${formatAmount(d.grand, d.currency)}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 12px;font-size:13px;font-weight:600;color:#1a1a18;">Amount paid</td>
+                  <td style="padding:4px 12px;font-size:13px;font-weight:600;color:#0ea5e9;text-align:right;">${formatAmount(amountPaid, d.currency)}</td>
+                </tr>
+                <tr style="border-top:2px solid #1a1a18;">
+                  <td style="padding:10px 12px 4px;font-size:15px;font-weight:700;color:#1a1a18;">Balance remaining</td>
+                  <td style="padding:10px 12px 4px;font-size:15px;font-weight:700;color:#ea580c;text-align:right;">${formatAmount(balance, d.currency)}</td>
+                </tr>
+              </table>
+              ${bankSection}
+              <div style="margin-top:24px;padding:12px 16px;background:#FFF7ED;border-radius:8px;">
+                <p style="margin:0;font-size:13px;color:#9a3412;">📎 The invoice PDF is attached to this email.</p>
+              </div>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 0 0;text-align:center;">
+            <p style="margin:0;font-size:11px;color:#9e9e99;">Thank you for your partial payment.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+}
+
 // ─── Quote email ──────────────────────────────────────────────────────────────
 
 function buildQuoteEmailHtml(d: InvoiceData, recipientEmail: string): string {
@@ -446,7 +577,7 @@ function buildQuoteEmailHtml(d: InvoiceData, recipientEmail: string): string {
 export async function POST(req: NextRequest) {
   try {
     const body: SendInvoiceRequest = await req.json()
-    const { type = 'invoice', isReceipt = false, invoiceData, recipientEmail, pdfBase64 } = body
+    const { type = 'invoice', isReceipt = false, isPartialReceipt = false, invoiceData, recipientEmail, pdfBase64 } = body
 
     if (!recipientEmail) {
       return NextResponse.json({ error: 'recipientEmail is required' }, { status: 400 })
@@ -464,6 +595,9 @@ export async function POST(req: NextRequest) {
     } else if (isReceipt) {
       subject = `Payment Receipt from ${invoiceData.bizName || 'us'} — ${invoiceData.invNumber}`
       html = buildReceiptEmailHtml(invoiceData, recipientEmail)
+    } else if (isPartialReceipt) {
+      subject = `Partial Payment Received — ${invoiceData.invNumber} from ${invoiceData.bizName || 'us'}`
+      html = buildPartialReceiptEmailHtml(invoiceData, recipientEmail)
     } else {
       subject = `Invoice ${invoiceData.invNumber} from ${invoiceData.bizName || 'us'}`
       html = buildEmailHtml(invoiceData, recipientEmail)
