@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatAmount } from '@/lib/format'
-import { generatePDF, invoiceToPDFData, fetchLogoDataUrl } from '@/lib/generatePDF'
+import { generatePDF, invoiceToPDFData } from '@/lib/generatePDF'
 import type { Invoice, Payment, Profile } from '@/lib/types'
 
 const INPUT =
