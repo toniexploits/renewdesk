@@ -9,6 +9,7 @@ import StatusBadge from '@/components/StatusBadge'
 import { generatePDF, invoiceToPDFData, fetchLogoDataUrl } from '@/lib/generatePDF'
 import DropdownPortal from '@/components/DropdownPortal'
 import RecordPaymentModal from '@/components/RecordPaymentModal'
+import { useSubscription } from '@/hooks/useSubscription'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -273,6 +274,7 @@ export default function InvoiceRow({
   onUpdate,
 }: InvoiceRowProps) {
   const supabase = createClient()
+  const { removeBranding } = useSubscription()
 
   const [logoDataUrl, setLogoDataUrl] = useState<string | undefined>(undefined)
   useEffect(() => {
@@ -351,7 +353,7 @@ export default function InvoiceRow({
     setActionError(null)
     setMenuOpen(false)
     try {
-      const pdfData = invoiceToPDFData(invoice, profile, logoDataUrl)
+      const pdfData = invoiceToPDFData(invoice, profile, logoDataUrl, undefined, removeBranding)
       const doc = generatePDF(pdfData)
       const slug = (invoice.client_name || 'Client').replace(/[^a-zA-Z0-9]/g, '_')
       doc.save(`${invoice.inv_number}-${slug}.pdf`)
@@ -374,7 +376,7 @@ export default function InvoiceRow({
     let pdfUrl = ''
 
     try {
-      const pdfData = invoiceToPDFData(invoice, profile, logoDataUrl)
+      const pdfData = invoiceToPDFData(invoice, profile, logoDataUrl, undefined, removeBranding)
       const doc = generatePDF(pdfData)
       const blob = doc.output('blob')
 
@@ -495,7 +497,7 @@ export default function InvoiceRow({
     setMenuOpen(false)
 
     try {
-      const pdfData = invoiceToPDFData(invoice, profile, logoDataUrl)
+      const pdfData = invoiceToPDFData(invoice, profile, logoDataUrl, undefined, removeBranding)
       const doc = generatePDF(pdfData)
       const pdfBase64 = doc.output('datauristring').split(',')[1]
 
@@ -661,7 +663,7 @@ export default function InvoiceRow({
       totalAmountPaid:   newAmountPaid,
       balanceRemaining:  Math.max(0, invoice.total - newAmountPaid),
       paymentDate:       payment.payment_date,
-    })
+    }, removeBranding)
     const doc = generatePDF(pdfData)
     doc.save(`${invoice.inv_number}-receipt-${payment.id.slice(0, 8)}.pdf`)
     setPaymentReceiptData(null)
@@ -1149,6 +1151,7 @@ export default function InvoiceRow({
           invoice={invoice}
           profile={profile}
           logoDataUrl={logoDataUrl}
+          removeBranding={removeBranding}
           onClose={() => setShowRecordPayment(false)}
           onSuccess={handleRecordPaymentSuccess}
         />

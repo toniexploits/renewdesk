@@ -246,7 +246,7 @@ export function generateQuotePDF(data: QuotePDFData): jsPDF {
 
 // ─── Convenience: build QuotePDFData from a saved Quote + Profile ─────────────
 
-export function quoteToPDFData(quote: Quote, profile: Profile | null): QuotePDFData {
+export function quoteToPDFData(quote: Quote, profile: Profile | null, removeBranding?: boolean): QuotePDFData {
   return {
     quoteNumber: quote.quote_number,
     bizName:     profile?.business_name ?? '',
@@ -270,5 +270,6 @@ export function quoteToPDFData(quote: Quote, profile: Profile | null): QuotePDFD
     taxAmount: quote.tax_amount,
     grand:     quote.total,
     status:    quote.status,
+    removeBranding: removeBranding ?? false,
   }
 }

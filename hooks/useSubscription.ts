@@ -70,5 +70,7 @@ export function useSubscription() {
     return PLAN_FEATURES[state.plan]?.includes(featureKey) ?? false
   }
 
-  return { ...state, canUseFeature, refresh }
+  const removeBranding = state.plan === 'pro' || state.plan === 'agency'
+
+  return { ...state, canUseFeature, refresh, removeBranding }
 }

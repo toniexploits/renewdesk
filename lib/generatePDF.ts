@@ -504,7 +504,8 @@ export function invoiceToPDFData(
     totalAmountPaid?: number
     balanceRemaining?: number
     paymentDate?: string
-  }
+  },
+  removeBranding?: boolean
 ): InvoicePDFData {
   const inv = invoice as Invoice & { payment_date?: string | null }
   const snap = invoice.bank_details_snapshot
@@ -550,6 +551,7 @@ export function invoiceToPDFData(
     paymentDate: inv.payment_date ?? invoice.updated_at ?? undefined,
     notes: invoice.notes ?? undefined,
     logoDataUrl,
+    removeBranding: removeBranding ?? false,
     // For partial invoices with no specific payment context, show running totals
     ...(invoice.status === 'partial' ? {
       totalAmountPaid: invoice.amount_paid,

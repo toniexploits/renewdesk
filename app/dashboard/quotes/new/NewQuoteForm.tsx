@@ -6,6 +6,7 @@ import { formatAmount, CURRENCY_OPTIONS } from '@/lib/format'
 import { generateQuotePDF } from '@/lib/generateQuotePDF'
 import type { Profile, Quote, LineItem, BankAccount, BankDetailsSnapshot } from '@/lib/types'
 import type { UsageResult } from '@/lib/usageLimits'
+import { useSubscription } from '@/hooks/useSubscription'
 import BankAccountSelector, {
   EMPTY_CUSTOM,
   buildBankSnapshot,
@@ -276,6 +277,7 @@ interface Props {
 }
 
 export default function NewQuoteForm({ profile, quote, bankAccounts, usage }: Props) {
+  const { removeBranding } = useSubscription()
   const [step, setStep]         = useState<1 | 2 | 3>(1)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
   const [warnDismissed, setWarnDismissed] = useState(false)
@@ -385,6 +387,7 @@ export default function NewQuoteForm({ profile, quote, bankAccounts, usage }: Pr
       bankCountry: snap?.bank_country || undefined,
       swiftCode: snap?.swift_code || undefined,
       iban: snap?.iban || undefined,
+      removeBranding,
     }
   }
 

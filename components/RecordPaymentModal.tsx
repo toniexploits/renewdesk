@@ -13,11 +13,12 @@ interface Props {
   invoice: Invoice
   profile?: Profile | null
   logoDataUrl?: string
+  removeBranding?: boolean
   onClose: () => void
   onSuccess: (payment: Payment, newAmountPaid: number, isFullyPaid: boolean) => void
 }
 
-export default function RecordPaymentModal({ invoice, profile, logoDataUrl, onClose, onSuccess }: Props) {
+export default function RecordPaymentModal({ invoice, profile, logoDataUrl, removeBranding, onClose, onSuccess }: Props) {
   const currency    = invoice.currency ?? 'NGN'
   const alreadyPaid = invoice.amount_paid ?? 0
   const balance     = invoice.total - alreadyPaid
@@ -110,7 +111,7 @@ export default function RecordPaymentModal({ invoice, profile, logoDataUrl, onCl
       totalAmountPaid:   cumulativePaid,
       balanceRemaining:  Math.max(0, invoice.total - cumulativePaid),
       paymentDate:       payment.payment_date,
-    })
+    }, removeBranding)
     const doc = generatePDF(pdfData)
     doc.save(`${invoice.inv_number}-receipt-${payment.id.slice(0, 8)}.pdf`)
   }
