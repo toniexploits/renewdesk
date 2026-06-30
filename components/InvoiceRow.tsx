@@ -1003,6 +1003,18 @@ export default function InvoiceRow({
           </div>
         )}
 
+        {/* Record payment */}
+        {!readonly && canRecordPayment && (
+          <button
+            onClick={() => setShowRecordPayment(true)}
+            disabled={anyBusy}
+            title="Record payment"
+            className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-md text-sky-500 hover:text-sky-700 hover:bg-sky-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <CheckIcon />
+          </button>
+        )}
+
         {/* Duplicate */}
         {!readonly && (
           <button
