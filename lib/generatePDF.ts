@@ -483,8 +483,8 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
     doc.setTextColor(158, 158, 153)
     doc.text(
       isPaid
-        ? 'Generated with RenewDesk by Barastreams · renewdesk.com · Thank you for your payment.'
-        : 'Generated with RenewDesk by Barastreams · renewdesk.com · Thank you for your business.',
+        ? 'Generated with RenewDesk by Barastreams · renewdeskapp.com · Thank you for your payment.'
+        : 'Generated with RenewDesk by Barastreams · renewdeskapp.com · Thank you for your business.',
       margin,
       282
     )

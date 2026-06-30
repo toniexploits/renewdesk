@@ -234,8 +234,8 @@ export function generateQuotePDF(data: QuotePDFData): jsPDF {
     doc.setTextColor(158, 158, 153)
     doc.text(
       data.validUntil
-        ? `Generated with RenewDesk by Barastreams · renewdesk.com · This quote is valid until ${validUntilFmt}.`
-        : 'Generated with RenewDesk by Barastreams · renewdesk.com',
+        ? `Generated with RenewDesk by Barastreams · renewdeskapp.com · This quote is valid until ${validUntilFmt}.`
+        : 'Generated with RenewDesk by Barastreams · renewdeskapp.com',
       margin,
       282
     )
