@@ -1,20 +1,23 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatAmount } from '@/lib/format'
-import type { Invoice, Payment } from '@/lib/types'
+import { generatePDF, invoiceToPDFData, fetchLogoDataUrl } from '@/lib/generatePDF'
+import type { Invoice, Payment, Profile } from '@/lib/types'
 
 const INPUT =
   'w-full px-3 py-2 rounded-lg bg-white border border-black/10 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all text-sm text-gray-900 placeholder:text-gray-300'
 
 interface Props {
   invoice: Invoice
+  profile?: Profile | null
+  logoDataUrl?: string
   onClose: () => void
   onSuccess: (payment: Payment, newAmountPaid: number, isFullyPaid: boolean) => void
 }
 
-export default function RecordPaymentModal({ invoice, onClose, onSuccess }: Props) {
+export default function RecordPaymentModal({ invoice, profile, logoDataUrl, onClose, onSuccess }: Props) {
   const currency    = invoice.currency ?? 'NGN'
   const alreadyPaid = invoice.amount_paid ?? 0
   const balance     = invoice.total - alreadyPaid
@@ -95,6 +98,23 @@ export default function RecordPaymentModal({ invoice, onClose, onSuccess }: Prop
     }
   }
 
+  function handleDownloadReceipt(payment: Payment, cumulativePaid: number) {
+    const isFullyPaidAtThatPoint = cumulativePaid >= invoice.total - 0.001
+    const updatedInvoice: Invoice = {
+      ...invoice,
+      status: isFullyPaidAtThatPoint ? 'paid' : 'partial',
+      amount_paid: cumulativePaid,
+    }
+    const pdfData = invoiceToPDFData(updatedInvoice, profile ?? null, logoDataUrl, {
+      amountThisPayment: payment.amount,
+      totalAmountPaid:   cumulativePaid,
+      balanceRemaining:  Math.max(0, invoice.total - cumulativePaid),
+      paymentDate:       payment.payment_date,
+    })
+    const doc = generatePDF(pdfData)
+    doc.save(`${invoice.inv_number}-receipt-${payment.id.slice(0, 8)}.pdf`)
+  }
+
   return (
     <div
       className="fixed inset-0 z-[300] flex items-center justify-center px-4"
@@ -151,23 +171,44 @@ export default function RecordPaymentModal({ invoice, onClose, onSuccess }: Prop
             <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 px-3 pt-2.5 pb-1.5">
               Payment history
             </p>
-            {history.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between px-3 py-2"
-                style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}
-              >
-                <div>
-                  <p className="text-xs font-semibold text-gray-800">{formatAmount(p.amount, p.currency)}</p>
-                  {p.notes && <p className="text-[10px] text-gray-400 mt-0.5">{p.notes}</p>}
-                </div>
-                <p className="text-[10px] text-gray-400">
-                  {new Date(p.payment_date + 'T00:00:00').toLocaleDateString('en-GB', {
-                    day: 'numeric', month: 'short', year: 'numeric',
-                  })}
-                </p>
-              </div>
-            ))}
+            {history.reduce<{ rows: ReactNode[]; running: number }>(
+              (acc, p) => {
+                const running = acc.running + p.amount
+                acc.rows.push(
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between px-3 py-2"
+                    style={{ borderTop: '1px solid rgba(0,0,0,0.04)' }}
+                  >
+                    <div>
+                      <p className="text-xs font-semibold text-gray-800">{formatAmount(p.amount, p.currency)}</p>
+                      {p.notes && <p className="text-[10px] text-gray-400 mt-0.5">{p.notes}</p>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] text-gray-400">
+                        {new Date(p.payment_date + 'T00:00:00').toLocaleDateString('en-GB', {
+                          day: 'numeric', month: 'short', year: 'numeric',
+                        })}
+                      </p>
+                      <button
+                        onClick={() => handleDownloadReceipt(p, running)}
+                        title="Download receipt"
+                        className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-brand hover:bg-brand/10 transition-colors"
+                        aria-label="Download receipt"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="7 10 12 15 17 10"/>
+                          <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )
+                return { rows: acc.rows, running }
+              },
+              { rows: [], running: 0 }
+            ).rows}
           </div>
         )}
 

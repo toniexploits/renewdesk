@@ -1147,6 +1147,8 @@ export default function InvoiceRow({
       {showRecordPayment && (
         <RecordPaymentModal
           invoice={invoice}
+          profile={profile}
+          logoDataUrl={logoDataUrl}
           onClose={() => setShowRecordPayment(false)}
           onSuccess={handleRecordPaymentSuccess}
         />
