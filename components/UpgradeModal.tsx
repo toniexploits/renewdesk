@@ -16,12 +16,15 @@ const FEATURES_PRO = [
   'Duplicate invoice',
   'Up to 5 bank accounts',
   'Remove RenewDesk branding',
+  'Client directory',
 ]
 
 const FEATURES_AGENCY = [
   'Everything in Pro',
   'Up to 10 bank accounts',
   'Team members',
+  'Recurring invoices',
+  'Custom email sender name',
 ]
 
 function LockIcon() {

@@ -211,6 +211,27 @@ export default async function HomePage() {
                 title: 'Team collaboration',
                 desc: 'Invite team members to manage your workspace. Everyone works from the same invoices, quotes, and client data.',
               },
+              {
+                icon: (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                ),
+                title: 'Client directory',
+                desc: 'Keep a searchable list of all your clients with full invoice history, total invoiced, collected, and outstanding — all at a glance.',
+              },
+              {
+                icon: (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <polyline points="1 20 1 14 7 14"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                  </svg>
+                ),
+                title: 'Recurring invoices',
+                desc: 'Set any invoice to repeat monthly, quarterly, or yearly. RenewDesk auto-generates them on schedule so you never miss a renewal.',
+              },
             ].map((feature) => (
               <div
                 key={feature.title}
@@ -334,6 +355,7 @@ export default async function HomePage() {
                   'Duplicate invoice',
                   'Up to 5 bank accounts',
                   'Remove RenewDesk branding',
+                  'Client directory',
                 ].map(f => (
                   <li key={f} className="flex items-start gap-2.5 text-sm text-gray-600">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5">
@@ -364,6 +386,8 @@ export default async function HomePage() {
                   'Everything in Pro',
                   'Up to 10 bank accounts',
                   'Team members',
+                  'Recurring invoices',
+                  'Custom email sender name',
                 ].map(f => (
                   <li key={f} className="flex items-start gap-2.5 text-sm text-gray-600">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5">
