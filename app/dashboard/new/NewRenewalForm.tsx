@@ -363,7 +363,7 @@ interface Props {
 }
 
 export default function NewRenewalForm({ profile, invoice, bankAccounts, usage }: Props) {
-  const { removeBranding } = useSubscription()
+  const { removeBranding, canUseFeature } = useSubscription()
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
   const [warnDismissed, setWarnDismissed] = useState(false)
@@ -668,6 +668,7 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts, usage }
 
   async function handleSendEmail() {
     if (!form.clientEmail) return
+    if (!canUseFeature('email_sending')) { setUpgradeOpen(true); return }
     setEmailLoading(true)
     setEmailFeedback(null)
 

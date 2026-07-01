@@ -148,6 +148,31 @@ export default function SettingsPage() {
       }
       if (usageRes.data) setUsage(usageRes.data)
       setLoading(false)
+
+      // Live usage counter — re-fetch whenever usage_tracking changes
+      const channel = supabase
+        .channel(`usage-${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'usage_tracking',
+            filter: `user_id=eq.${user.id}`,
+          },
+          async () => {
+            const { data } = await supabase
+              .from('usage_tracking')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('billing_month', month)
+              .single()
+            if (data) setUsage(data)
+          }
+        )
+        .subscribe()
+
+      return () => { supabase.removeChannel(channel) }
     }
 
     load()
