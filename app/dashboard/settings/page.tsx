@@ -9,7 +9,8 @@ import UpgradeModal from '@/components/UpgradeModal'
 
 const INPUT = 'w-full px-3.5 py-2.5 rounded-lg bg-surface border border-black/10 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all placeholder:text-gray-300 text-base text-gray-900'
 
-const MAX_ACCOUNTS = 10
+const AGENCY_MAX_ACCOUNTS = 10
+const PRO_MAX_ACCOUNTS = 5
 const STARTER_MAX_ACCOUNTS = 1
 
 function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
@@ -267,10 +268,11 @@ export default function SettingsPage() {
   }
 
   const isStarter = !subscription || subscription.plan_name === 'starter'
-  const maxAccounts = isStarter ? STARTER_MAX_ACCOUNTS : MAX_ACCOUNTS
+  const isPro = subscription?.plan_name === 'pro'
+  const maxAccounts = isStarter ? STARTER_MAX_ACCOUNTS : isPro ? PRO_MAX_ACCOUNTS : AGENCY_MAX_ACCOUNTS
 
   function startAdd() {
-    if (isStarter && accounts.length >= STARTER_MAX_ACCOUNTS) {
+    if (accounts.length >= maxAccounts && (isStarter || isPro)) {
       setUpgradeOpen(true)
       return
     }
@@ -313,11 +315,11 @@ export default function SettingsPage() {
     if (!accountForm.account_number.trim()){ setAccountError('Account number is required.'); return }
 
     if (adding && accounts.length >= maxAccounts) {
-      if (isStarter) {
+      if (isStarter || isPro) {
         setUpgradeOpen(true)
         return
       }
-      setAccountError(`You can save up to ${MAX_ACCOUNTS} bank accounts.`)
+      setAccountError(`You can save up to ${AGENCY_MAX_ACCOUNTS} bank accounts.`)
       return
     }
 
@@ -646,7 +648,7 @@ export default function SettingsPage() {
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-brand flex-shrink-0" />
                 <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
-                  Bank accounts ({accounts.length}/{isStarter ? STARTER_MAX_ACCOUNTS : MAX_ACCOUNTS})
+                  Bank accounts ({accounts.length}/{maxAccounts})
                 </p>
               </div>
               {!adding && !editingId && accounts.length < maxAccounts && (
@@ -757,15 +759,15 @@ export default function SettingsPage() {
               isStarter ? (
                 <div className="mt-3 flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 bg-amber-50" style={{ border: '1px solid rgba(245,158,11,0.25)' }}>
                   <p className="text-xs text-amber-700">Starter plan is limited to {STARTER_MAX_ACCOUNTS} bank account. Upgrade to add more.</p>
-                  <button
-                    onClick={() => setUpgradeOpen(true)}
-                    className="flex-shrink-0 text-xs font-semibold text-amber-700 underline underline-offset-2 hover:text-amber-900"
-                  >
-                    Upgrade
-                  </button>
+                  <button onClick={() => setUpgradeOpen(true)} className="flex-shrink-0 text-xs font-semibold text-amber-700 underline underline-offset-2 hover:text-amber-900">Upgrade</button>
+                </div>
+              ) : isPro ? (
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 bg-amber-50" style={{ border: '1px solid rgba(245,158,11,0.25)' }}>
+                  <p className="text-xs text-amber-700">Pro plan is limited to {PRO_MAX_ACCOUNTS} bank accounts. Upgrade to Agency to add more.</p>
+                  <button onClick={() => setUpgradeOpen(true)} className="flex-shrink-0 text-xs font-semibold text-amber-700 underline underline-offset-2 hover:text-amber-900">Upgrade</button>
                 </div>
               ) : (
-                <p className="text-xs text-gray-400 mt-3">Maximum {MAX_ACCOUNTS} bank accounts reached.</p>
+                <p className="text-xs text-gray-400 mt-3">Maximum {AGENCY_MAX_ACCOUNTS} bank accounts reached.</p>
               )
             )}
           </div>
