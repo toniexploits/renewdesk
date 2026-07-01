@@ -56,32 +56,27 @@ function AcceptInviteContent() {
     if (!session?.user) {
       setState('prompt_login')
     } else {
-      await acceptInvite(session.user.id, invite)
+      await acceptInvite(session.user.id, { token: String(token) })
     }
   }
 
-  async function acceptInvite(userId: string, invite: { id: string; owner_id: string; role: string; invited_email: string }) {
+  async function acceptInvite(_userId: string, invite: { token?: string }) {
     setState('accepting')
-    const supabase = createClient()
 
-    // Insert into team_members
-    const { error: memberErr } = await supabase.from('team_members').insert({
-      owner_id: invite.owner_id,
-      member_user_id: userId,
-      role: invite.role,
+    const res = await fetch('/api/team/accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: invite.token ?? token }),
     })
 
-    if (memberErr && !memberErr.message.includes('duplicate')) {
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      if (res.status === 409) { setState('already_accepted'); return }
+      if (res.status === 410) { setState('expired'); return }
       setState('error')
-      setErrorMsg(memberErr.message)
+      setErrorMsg(body.error || 'Unable to accept invitation.')
       return
     }
-
-    // Mark invitation as accepted
-    await supabase
-      .from('team_invitations')
-      .update({ status: 'accepted' })
-      .eq('id', invite.id)
 
     setState('success')
     setTimeout(() => router.push('/dashboard'), 2500)
@@ -103,7 +98,7 @@ function AcceptInviteContent() {
       .maybeSingle()
 
     if (!invite) { setState('invalid'); return }
-    await acceptInvite(session.user.id, invite)
+    await acceptInvite(session.user.id, { token: String(token) })
   }
 
   return (
