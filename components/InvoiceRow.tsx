@@ -12,6 +12,7 @@ import RecordPaymentModal from '@/components/RecordPaymentModal'
 import UpgradeModal from '@/components/UpgradeModal'
 import { useSubscription } from '@/hooks/useSubscription'
 import { logEvent } from '@/lib/logEvent'
+import RecurringModal from '@/components/RecurringModal'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -278,6 +279,7 @@ export default function InvoiceRow({
   const supabase = createClient()
   const { removeBranding, canUseFeature } = useSubscription()
   const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [recurringOpen, setRecurringOpen] = useState(false)
 
   const [logoDataUrl, setLogoDataUrl] = useState<string | undefined>(undefined)
   useEffect(() => {
@@ -836,6 +838,20 @@ export default function InvoiceRow({
                       disabled={anyBusy}
                     />
 
+                    {/* Make recurring */}
+                    <DropdownItem
+                      icon={
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="23 4 23 10 17 10"/>
+                          <polyline points="1 20 1 14 7 14"/>
+                          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                      }
+                      label="Make recurring"
+                      onClick={() => { setMenuOpen(false); setRecurringOpen(true) }}
+                      disabled={anyBusy || isDraft}
+                    />
+
                     {/* Edit */}
                     <Link
                       href={`/dashboard/new?edit=${invoice.id}`}
@@ -1153,6 +1169,13 @@ export default function InvoiceRow({
       )}
 
       <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+      <RecurringModal
+        invoiceId={invoice.id}
+        clientName={invoice.client_name}
+        isOpen={recurringOpen}
+        onClose={() => setRecurringOpen(false)}
+        onSaved={() => setRecurringOpen(false)}
+      />
 
       {/* Record payment modal */}
       {showRecordPayment && (

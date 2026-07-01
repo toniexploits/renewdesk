@@ -158,6 +158,32 @@ export interface UsageTracking {
   updated_at: string
 }
 
+export type RecurringFrequency = 'monthly' | 'quarterly' | 'yearly'
+export type RecurringStatus = 'active' | 'paused' | 'cancelled'
+
+export interface RecurringInvoice {
+  id: string
+  user_id: string
+  client_name: string
+  client_email: string | null
+  client_phone: string | null
+  contact_name: string | null
+  service_name: string | null
+  service_plan: string | null
+  line_items: import('./types').LineItem[]
+  tax_rate: number
+  currency: string
+  notes: string | null
+  bank_account_id: string | null
+  bank_details_snapshot: import('./types').BankDetailsSnapshot | null
+  frequency: RecurringFrequency
+  next_due_date: string
+  status: RecurringStatus
+  source_invoice_id: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Client {
   id: string
   user_id: string
