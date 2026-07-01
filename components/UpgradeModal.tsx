@@ -13,8 +13,6 @@ interface Props {
 const FEATURES_PRO = [
   'Unlimited invoices & quotes',
   'Email sending with PDF attachment',
-  'Receipt conversion',
-  'Quote to invoice conversion',
   'Duplicate invoice',
   'Up to 5 bank accounts',
   'Remove RenewDesk branding',
@@ -22,10 +20,8 @@ const FEATURES_PRO = [
 
 const FEATURES_AGENCY = [
   'Everything in Pro',
-  'Unlimited bank accounts',
+  'Up to 10 bank accounts',
   'Team members',
-  'Custom templates',
-  'Advanced analytics',
 ]
 
 function LockIcon() {
