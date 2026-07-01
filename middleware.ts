@@ -36,6 +36,8 @@ export async function middleware(request: NextRequest) {
     || pathname === '/reset-password'
     || pathname === '/pricing'
     || pathname === '/'
+    || pathname === '/upgrade'
+    || pathname.startsWith('/accept-invite')
   const isAdminRoute  = pathname.startsWith('/rd-admin')
 
   if (isAuthRoute && user) {
