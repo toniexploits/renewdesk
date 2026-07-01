@@ -158,6 +158,19 @@ export interface UsageTracking {
   updated_at: string
 }
 
+export interface Client {
+  id: string
+  user_id: string
+  name: string
+  email: string | null
+  phone: string | null
+  contact_name: string | null
+  address: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type QuoteStatus = 'draft' | 'sent' | 'approved' | 'converted'
 
 export interface Quote {
