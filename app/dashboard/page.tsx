@@ -4,6 +4,7 @@ import MetricCard from '@/components/MetricCard'
 import InvoiceRow from '@/components/InvoiceRow'
 import UpgradeDetector from '@/components/dashboard/UpgradeDetector'
 import { formatAmount } from '@/lib/format'
+import { getEffectiveUserId } from '@/lib/team'
 import type { Invoice } from '@/lib/types'
 
 export default async function DashboardPage({
@@ -14,10 +15,12 @@ export default async function DashboardPage({
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  const effectiveUserId = await getEffectiveUserId(user!.id)
+
   const [{ data: profile }, { data: invoices }, { data: quotes }] = await Promise.all([
-    supabase.from('profiles').select('full_name, currency').eq('id', user!.id).single(),
-    supabase.from('invoices').select('*').eq('user_id', user!.id).order('created_at', { ascending: false }),
-    supabase.from('quotes').select('id, status, total, valid_until').eq('user_id', user!.id),
+    supabase.from('profiles').select('full_name, currency').eq('id', effectiveUserId).single(),
+    supabase.from('invoices').select('*').eq('user_id', effectiveUserId).order('created_at', { ascending: false }),
+    supabase.from('quotes').select('id, status, total, valid_until').eq('user_id', effectiveUserId),
   ])
 
   const allInvoices: Invoice[] = (invoices as Invoice[]) ?? []

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import NewQuoteForm from './NewQuoteForm'
 import type { Profile, Quote, BankAccount } from '@/lib/types'
 import { canCreateQuote } from '@/lib/usageLimits'
+import { getEffectiveUserId } from '@/lib/team'
 
 export default async function NewQuotePage({
   searchParams,
@@ -11,23 +12,25 @@ export default async function NewQuotePage({
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  const effectiveUserId = await getEffectiveUserId(user!.id)
+
   const [{ data: profile }, { data: quote }, { data: bankAccounts }, usage] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', user!.id).single(),
+    supabase.from('profiles').select('*').eq('id', effectiveUserId).single(),
     searchParams.edit
       ? supabase
           .from('quotes')
           .select('*')
           .eq('id', searchParams.edit)
-          .eq('user_id', user!.id)
+          .eq('user_id', effectiveUserId)
           .single()
       : Promise.resolve({ data: null }),
     supabase
       .from('bank_accounts')
       .select('*')
-      .eq('user_id', user!.id)
+      .eq('user_id', effectiveUserId)
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: true }),
-    canCreateQuote(user!.id),
+    canCreateQuote(effectiveUserId),
   ])
 
   const isEditing = !!quote

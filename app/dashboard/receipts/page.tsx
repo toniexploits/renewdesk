@@ -6,16 +6,20 @@ import { createClient } from '@/lib/supabase/client'
 import type { Invoice, InvoiceStatus, Profile } from '@/lib/types'
 import { formatAmount } from '@/lib/format'
 import InvoiceRow from '@/components/InvoiceRow'
+import { useTeam } from '@/contexts/TeamContext'
 
 type PaidInvoice = Invoice & { payment_date: string | null }
 
 export default function ReceiptsPage() {
+  const { effectiveUserId } = useTeam()
   const [receipts, setReceipts] = useState<PaidInvoice[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
   useEffect(() => {
+    if (!effectiveUserId) return
+    const uid = effectiveUserId
     const supabase = createClient()
     let channel: ReturnType<typeof supabase.channel> | null = null
     let active = true
@@ -35,15 +39,12 @@ export default function ReceiptsPage() {
 
     async function init() {
       const { data: { session } } = await supabase.auth.getSession()
-      const user = session?.user
-      if (!user) { if (active) setLoading(false); return }
+      if (!session?.user) { if (active) setLoading(false); return }
       if (!active) return
 
-      const userId = user.id
-
       const [, profileResult] = await Promise.all([
-        fetchReceipts(userId),
-        supabase.from('profiles').select('*').eq('id', userId).single(),
+        fetchReceipts(uid),
+        supabase.from('profiles').select('*').eq('id', uid).single(),
       ])
       if (active && profileResult.data) {
         setProfile(profileResult.data as Profile)
@@ -51,11 +52,11 @@ export default function ReceiptsPage() {
       if (!active) return
 
       channel = supabase
-        .channel(`receipts-${userId}`)
+        .channel(`receipts-${uid}`)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'invoices', filter: `user_id=eq.${userId}` },
-          () => { if (active) fetchReceipts(userId) }
+          { event: '*', schema: 'public', table: 'invoices', filter: `user_id=eq.${uid}` },
+          () => { if (active) fetchReceipts(uid) }
         )
         .subscribe()
     }
@@ -69,7 +70,7 @@ export default function ReceiptsPage() {
         channel = null
       }
     }
-  }, [])
+  }, [effectiveUserId])
 
   function handleStatusChange(id: string, status: InvoiceStatus) {
     // If a receipt is reverted to non-paid status, drop it from this list

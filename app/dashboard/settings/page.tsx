@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { CURRENCY_OPTIONS } from '@/lib/format'
-import type { BankAccount, UserSubscription } from '@/lib/types'
+import type { BankAccount, UserSubscription, TeamMember } from '@/lib/types'
 import { maskAccountNumber } from '@/components/BankAccountSelector'
 import UpgradeModal from '@/components/UpgradeModal'
 
@@ -88,6 +88,16 @@ export default function SettingsPage() {
   const [accountError, setAccountError] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
+  // Team members (Agency plan)
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [teamLoading, setTeamLoading] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<'member' | 'admin'>('member')
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [inviteFeedback, setInviteFeedback] = useState<string | null>(null)
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
+
   useEffect(() => {
     const supabase = createClient()
 
@@ -122,7 +132,19 @@ export default function SettingsPage() {
         setBillingCurrencyState(profileRes.data.billing_currency ?? 'NGN')
       }
       if (accountsRes.data) setAccounts(accountsRes.data as BankAccount[])
-      if (subRes.data) setSubscription(subRes.data as UserSubscription)
+      if (subRes.data) {
+        setSubscription(subRes.data as UserSubscription)
+        if ((subRes.data as UserSubscription).plan_name === 'agency') {
+          setTeamLoading(true)
+          const { data: members } = await supabase
+            .from('team_members')
+            .select('*')
+            .eq('owner_id', user.id)
+            .order('created_at', { ascending: true })
+          if (members) setTeamMembers(members as TeamMember[])
+          setTeamLoading(false)
+        }
+      }
       if (usageRes.data) setUsage(usageRes.data)
       setLoading(false)
     }
@@ -409,6 +431,49 @@ export default function SettingsPage() {
       }
     }
     setConfirmDeleteId(null)
+  }
+
+  async function handleInvite() {
+    if (!inviteEmail.trim()) { setInviteError('Email is required.'); return }
+    setInviteLoading(true)
+    setInviteError(null)
+    setInviteFeedback(null)
+    try {
+      const res = await fetch('/api/team/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setInviteError(json.error ?? 'Failed to send invite.')
+      } else {
+        setInviteFeedback(`Invite sent to ${inviteEmail.trim()}.`)
+        setInviteEmail('')
+        setInviteRole('member')
+      }
+    } catch {
+      setInviteError('An unexpected error occurred.')
+    } finally {
+      setInviteLoading(false)
+    }
+  }
+
+  async function handleRemoveMember(memberId: string) {
+    setRemovingMemberId(memberId)
+    try {
+      const res = await fetch(`/api/team/members/${memberId}`, { method: 'DELETE' })
+      if (res.ok) {
+        setTeamMembers((prev) => prev.filter((m) => m.id !== memberId))
+      } else {
+        const json = await res.json()
+        setFeedback({ type: 'error', message: json.error ?? 'Failed to remove member.' })
+      }
+    } catch {
+      setFeedback({ type: 'error', message: 'Unexpected error removing member.' })
+    } finally {
+      setRemovingMemberId(null)
+    }
   }
 
   const cardStyle = {
@@ -851,6 +916,103 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Team Members (Agency plan only) */}
+      {subscription?.plan_name === 'agency' && (
+        <div className="mt-8 mb-4">
+          <SectionTitle>Team members</SectionTitle>
+
+          <div className="bg-white rounded-xl p-5 mb-4" style={cardStyle}>
+            <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+              Invite team members to access and manage your workspace. They can create invoices, quotes, and record payments on your behalf.
+            </p>
+
+            {/* Invite form */}
+            <div className="flex flex-col sm:flex-row gap-2 mb-4">
+              <input
+                type="email"
+                className={`${INPUT} flex-1`}
+                placeholder="colleague@example.com"
+                value={inviteEmail}
+                onChange={(e) => { setInviteEmail(e.target.value); setInviteError(null) }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleInvite() }}
+              />
+              <select
+                className={`${INPUT} w-full sm:w-36`}
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value as 'member' | 'admin')}
+              >
+                <option value="member">Member</option>
+                <option value="admin">Admin</option>
+              </select>
+              <button
+                onClick={handleInvite}
+                disabled={inviteLoading}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-dark transition-colors disabled:opacity-60 whitespace-nowrap"
+              >
+                {inviteLoading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.23 19.79 19.79 0 0 1 1.61 4.6 2 2 0 0 1 3.6 2.4h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.29 6.29l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 17.5v-.58z"/>
+                    <line x1="18" y1="6" x2="23" y2="1"/>
+                    <line x1="23" y1="6" x2="18" y2="1"/>
+                  </svg>
+                )}
+                Send invite
+              </button>
+            </div>
+
+            {inviteError && (
+              <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">{inviteError}</p>
+            )}
+            {inviteFeedback && (
+              <p className="text-xs text-brand bg-[#E1F5EE] rounded-lg px-3 py-2 mb-3">{inviteFeedback}</p>
+            )}
+
+            {/* Members list */}
+            {teamLoading ? (
+              <div className="flex items-center gap-2 py-3 text-sm text-gray-400">
+                <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                Loading members…
+              </div>
+            ) : teamMembers.length === 0 ? (
+              <div className="rounded-lg p-4 text-center text-sm text-gray-400 bg-surface">
+                No team members yet. Invite someone above.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {teamMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex items-center justify-between gap-3 rounded-lg px-3.5 py-3"
+                    style={{ background: '#fafaf7', border: '1px solid rgba(0,0,0,0.06)' }}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{member.member_email ?? member.member_user_id}</p>
+                      {member.member_name && (
+                        <p className="text-xs text-gray-400">{member.member_name}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize bg-surface text-gray-500" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
+                        {member.role}
+                      </span>
+                      <button
+                        onClick={() => handleRemoveMember(member.id)}
+                        disabled={removingMemberId === member.id}
+                        className="text-xs font-medium text-red-500 hover:text-red-700 disabled:opacity-50"
+                      >
+                        {removingMemberId === member.id ? 'Removing…' : 'Remove'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Upgrade modal */}
       <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} />

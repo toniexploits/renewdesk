@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Invoice, InvoiceStatus, Profile } from '@/lib/types'
 import { formatAmount } from '@/lib/format'
 import InvoiceRow from '@/components/InvoiceRow'
+import { useTeam } from '@/contexts/TeamContext'
 
 type FilterTab = 'all' | InvoiceStatus
 
@@ -20,12 +21,15 @@ const TABS: { key: FilterTab; label: string }[] = [
 ]
 
 export default function InvoicesPage() {
+  const { effectiveUserId } = useTeam()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<FilterTab>('all')
 
   useEffect(() => {
+    if (!effectiveUserId) return
+    const uid = effectiveUserId
     const supabase = createClient()
     let channel: ReturnType<typeof supabase.channel> | null = null
     let active = true
@@ -44,15 +48,12 @@ export default function InvoicesPage() {
 
     async function init() {
       const { data: { session } } = await supabase.auth.getSession()
-      const user = session?.user
-      if (!user) { if (active) setLoading(false); return }
+      if (!session?.user) { if (active) setLoading(false); return }
       if (!active) return
 
-      const userId = user.id
-
       const [, profileResult] = await Promise.all([
-        fetchInvoices(userId),
-        supabase.from('profiles').select('*').eq('id', userId).single(),
+        fetchInvoices(uid),
+        supabase.from('profiles').select('*').eq('id', uid).single(),
       ])
       if (active && profileResult.data) {
         setProfile(profileResult.data as Profile)
@@ -60,11 +61,11 @@ export default function InvoicesPage() {
       if (!active) return
 
       channel = supabase
-        .channel(`invoices-${userId}`)
+        .channel(`invoices-${uid}`)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'invoices', filter: `user_id=eq.${userId}` },
-          () => { if (active) fetchInvoices(userId) }
+          { event: '*', schema: 'public', table: 'invoices', filter: `user_id=eq.${uid}` },
+          () => { if (active) fetchInvoices(uid) }
         )
         .subscribe()
     }
@@ -78,7 +79,7 @@ export default function InvoicesPage() {
         channel = null
       }
     }
-  }, [])
+  }, [effectiveUserId])
 
   function handleDelete(id: string) {
     setInvoices((prev) => prev.filter((i) => i.id !== id))

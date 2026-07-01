@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Quote, QuoteStatus, Profile } from '@/lib/types'
 import { formatAmount } from '@/lib/format'
 import QuoteRow from '@/components/QuoteRow'
+import { useTeam } from '@/contexts/TeamContext'
 
 type FilterTab = 'all' | QuoteStatus
 
@@ -18,12 +19,15 @@ const TABS: { key: FilterTab; label: string }[] = [
 ]
 
 export default function QuotesPage() {
+  const { effectiveUserId } = useTeam()
   const [quotes,    setQuotes]    = useState<Quote[]>([])
   const [profile,   setProfile]   = useState<Profile | null>(null)
   const [loading,   setLoading]   = useState(true)
   const [activeTab, setActiveTab] = useState<FilterTab>('all')
 
   useEffect(() => {
+    if (!effectiveUserId) return
+    const uid = effectiveUserId
     const supabase = createClient()
     let active  = true
     let channel: ReturnType<typeof supabase.channel> | null = null
@@ -42,24 +46,22 @@ export default function QuotesPage() {
 
     async function init() {
       const { data: { session } } = await supabase.auth.getSession()
-      const user = session?.user
-      if (!user) { if (active) setLoading(false); return }
+      if (!session?.user) { if (active) setLoading(false); return }
       if (!active) return
 
-      const userId = user.id
       const [, profileResult] = await Promise.all([
-        fetchQuotes(userId),
-        supabase.from('profiles').select('*').eq('id', userId).single(),
+        fetchQuotes(uid),
+        supabase.from('profiles').select('*').eq('id', uid).single(),
       ])
       if (active && profileResult.data) setProfile(profileResult.data as Profile)
       if (!active) return
 
       channel = supabase
-        .channel(`quotes-${userId}`)
+        .channel(`quotes-${uid}`)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'quotes', filter: `user_id=eq.${userId}` },
-          () => { if (active) fetchQuotes(userId) }
+          { event: '*', schema: 'public', table: 'quotes', filter: `user_id=eq.${uid}` },
+          () => { if (active) fetchQuotes(uid) }
         )
         .subscribe()
     }
@@ -69,7 +71,7 @@ export default function QuotesPage() {
       active = false
       if (channel) { supabase.removeChannel(channel); channel = null }
     }
-  }, [])
+  }, [effectiveUserId])
 
   function handleDelete(id: string) {
     setQuotes((prev) => prev.filter((q) => q.id !== id))

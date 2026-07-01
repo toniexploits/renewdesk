@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import NewRenewalForm from './NewRenewalForm'
 import type { Profile, Invoice, BankAccount } from '@/lib/types'
 import { canCreateInvoice } from '@/lib/usageLimits'
+import { getEffectiveUserId } from '@/lib/team'
 
 export default async function NewRenewalPage({
   searchParams,
@@ -11,18 +12,20 @@ export default async function NewRenewalPage({
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  const effectiveUserId = await getEffectiveUserId(user!.id)
+
   const [{ data: profile }, { data: invoice }, { data: bankAccounts }, usage] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', user!.id).single(),
+    supabase.from('profiles').select('*').eq('id', effectiveUserId).single(),
     searchParams.edit
-      ? supabase.from('invoices').select('*').eq('id', searchParams.edit).eq('user_id', user!.id).single()
+      ? supabase.from('invoices').select('*').eq('id', searchParams.edit).eq('user_id', effectiveUserId).single()
       : Promise.resolve({ data: null }),
     supabase
       .from('bank_accounts')
       .select('*')
-      .eq('user_id', user!.id)
+      .eq('user_id', effectiveUserId)
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: true }),
-    canCreateInvoice(user!.id),
+    canCreateInvoice(effectiveUserId),
   ])
 
   const isEditing = !!invoice

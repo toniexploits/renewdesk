@@ -53,6 +53,31 @@ export interface BankDetailsSnapshot {
 
 export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled' | 'draft' | 'partial'
 
+export interface TeamMember {
+  id: string
+  owner_id: string
+  member_user_id: string
+  role: 'member' | 'admin'
+  created_at: string
+  // joined via profiles query
+  member_email?: string
+  member_name?: string
+}
+
+export interface TeamInvitation {
+  id: string
+  owner_id: string
+  invited_email: string
+  role: 'member' | 'admin'
+  token: string
+  status: 'pending' | 'accepted' | 'revoked'
+  expires_at: string
+  created_at: string
+  // joined via profiles query
+  owner_name?: string
+  owner_business?: string
+}
+
 export interface Payment {
   id: string
   invoice_id: string
