@@ -1055,6 +1055,22 @@ export default function InvoiceRow({
           </button>
         )}
 
+        {/* Make recurring */}
+        {!readonly && !isDraft && (
+          <button
+            onClick={() => setRecurringOpen(true)}
+            disabled={anyBusy}
+            title="Make recurring"
+            className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-md text-gray-400 hover:text-brand hover:bg-brand/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+          </button>
+        )}
+
         {/* Edit / Complete (for drafts, label changes to "Complete") */}
         {!readonly && (
           <Link
