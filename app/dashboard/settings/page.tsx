@@ -69,6 +69,7 @@ export default function SettingsPage() {
     business_email: '',
     currency: 'NGN',
     tax_rate: 7.5,
+    email_sender_name: '',
   })
 
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
@@ -128,6 +129,7 @@ export default function SettingsPage() {
           business_email: profileRes.data.business_email ?? '',
           currency: profileRes.data.currency ?? 'NGN',
           tax_rate: profileRes.data.tax_rate ?? 7.5,
+          email_sender_name: profileRes.data.email_sender_name ?? '',
         })
         setLogoUrl(profileRes.data.logo_url ?? null)
         setBillingCurrencyState(profileRes.data.billing_currency ?? 'NGN')
@@ -204,6 +206,7 @@ export default function SettingsPage() {
           business_email: profileForm.business_email || null,
           currency: profileForm.currency,
           tax_rate: profileForm.tax_rate,
+          email_sender_name: profileForm.email_sender_name?.trim() || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', userId)
@@ -943,6 +946,39 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Email branding (Agency plan only) */}
+      {subscription?.plan_name === 'agency' && (
+        <div className="mt-8 mb-4">
+          <SectionTitle>Email branding</SectionTitle>
+          <div className="bg-white rounded-xl p-5" style={cardStyle}>
+            <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+              Customise the sender name that appears in client email inboxes. Leave blank to use the default <strong>RenewDesk</strong> sender name.
+            </p>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Sender name</label>
+              <input
+                className={INPUT}
+                placeholder="e.g. Acme Agency"
+                value={profileForm.email_sender_name}
+                onChange={(e) => setProfileField('email_sender_name', e.target.value)}
+              />
+              <p className="mt-1.5 text-[11px] text-gray-400">
+                Clients will see: <span className="font-medium text-gray-600">{profileForm.email_sender_name?.trim() || 'RenewDesk'} &lt;invoices@renewdeskapp.com&gt;</span>
+              </p>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={(e) => handleProfileSubmit(e as unknown as React.FormEvent)}
+                disabled={saving}
+                className="px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-dark disabled:opacity-60 transition-colors"
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Team Members (Agency plan only) */}
       {subscription?.plan_name === 'agency' && (

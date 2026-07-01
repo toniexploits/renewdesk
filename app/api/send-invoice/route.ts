@@ -606,9 +606,23 @@ export async function POST(req: NextRequest) {
     }
     const filename = `${invoiceData.invNumber}-${invoiceData.clientName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
 
+    // Resolve custom sender name for agency users
+    const supabaseForSender = createClient()
+    const { data: { user: senderUser } } = await supabaseForSender.auth.getUser()
+    let senderName = 'RenewDesk'
+    if (senderUser) {
+      const { data: senderProfile } = await supabaseForSender
+        .from('profiles')
+        .select('email_sender_name')
+        .eq('id', senderUser.id)
+        .single()
+      if (senderProfile?.email_sender_name) senderName = senderProfile.email_sender_name
+    }
+    const fromAddress = process.env.RESEND_FROM_EMAIL || 'invoices@renewdeskapp.com'
+
     const resend = new Resend(process.env.RESEND_API_KEY)
     const { data, error } = await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL || 'invoices@renewdeskapp.com',
+      from: `${senderName} <${fromAddress}>`,
       to: [recipientEmail],
       subject,
       html,
