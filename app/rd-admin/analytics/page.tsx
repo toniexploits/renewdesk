@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { createAdminClient } from '@/lib/supabase/admin'
 import AnalyticsCharts, { type CurrencyBreakdown, type TopUser, type DayHeatmapEntry } from '@/components/admin/AnalyticsCharts'
 import { formatAmount } from '@/lib/format'

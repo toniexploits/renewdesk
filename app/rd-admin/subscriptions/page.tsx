@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { createAdminClient } from '@/lib/supabase/admin'
 
 function fmtCurrency(amount: number, currency: string) {
