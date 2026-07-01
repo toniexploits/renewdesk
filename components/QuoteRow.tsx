@@ -9,6 +9,7 @@ import { generateQuotePDF, quoteToPDFData } from '@/lib/generateQuotePDF'
 import { formatAmount } from '@/lib/format'
 import type { Quote, QuoteStatus, Profile } from '@/lib/types'
 import { useSubscription } from '@/hooks/useSubscription'
+import UpgradeModal from './UpgradeModal'
 
 const CLOSE_MENUS_EVENT = 'renewdesk:close-menus'
 
@@ -37,8 +38,9 @@ interface Props {
 }
 
 export default function QuoteRow({ quote, profile, onDelete, onUpdate, readonly }: Props) {
-  const { removeBranding } = useSubscription()
+  const { removeBranding, canUseFeature } = useSubscription()
   const [menuOpen,        setMenuOpen]        = useState(false)
+  const [upgradeOpen,     setUpgradeOpen]     = useState(false)
   const [confirmDelete,   setConfirmDelete]   = useState(false)
   const [confirmConvert,  setConfirmConvert]  = useState(false)
   const [actionLoading,   setActionLoading]   = useState(false)
@@ -239,6 +241,7 @@ export default function QuoteRow({ quote, profile, onDelete, onUpdate, readonly 
   async function handleSendEmail() {
     setMenuOpen(false)
     if (!quote.client_email) return
+    if (!canUseFeature('email_sending')) { setUpgradeOpen(true); return }
     try {
       const doc     = generateQuotePDF(quoteToPDFData(quote, profile ?? null, removeBranding))
       const pdfBase64 = doc.output('datauristring').split(',')[1]
@@ -602,6 +605,7 @@ export default function QuoteRow({ quote, profile, onDelete, onUpdate, readonly 
           )}
         </div>
       )}
+      <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
     </>
   )
 }

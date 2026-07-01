@@ -494,6 +494,7 @@ export default function InvoiceRow({
 
   async function handleEmail() {
     if (anyBusy || isDraft || !invoice.client_email) return
+    if (!canUseFeature('email_sending')) { setMenuOpen(false); setUpgradeOpen(true); return }
     setActionLoading('email')
     setActionError(null)
     setMenuOpen(false)
