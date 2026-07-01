@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
       owner_id: invite.owner_id,
       member_user_id: user.id,
       role: invite.role,
+      member_email: invite.invited_email,
     })
 
   if (memberErr && !memberErr.message.includes('duplicate')) {
