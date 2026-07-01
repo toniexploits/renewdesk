@@ -9,6 +9,7 @@ import StatusBadge from '@/components/StatusBadge'
 import { generatePDF, invoiceToPDFData, fetchLogoDataUrl } from '@/lib/generatePDF'
 import DropdownPortal from '@/components/DropdownPortal'
 import RecordPaymentModal from '@/components/RecordPaymentModal'
+import UpgradeModal from '@/components/UpgradeModal'
 import { useSubscription } from '@/hooks/useSubscription'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -274,7 +275,8 @@ export default function InvoiceRow({
   onUpdate,
 }: InvoiceRowProps) {
   const supabase = createClient()
-  const { removeBranding } = useSubscription()
+  const { removeBranding, canUseFeature } = useSubscription()
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
 
   const [logoDataUrl, setLogoDataUrl] = useState<string | undefined>(undefined)
   useEffect(() => {
@@ -552,6 +554,7 @@ export default function InvoiceRow({
 
   async function handleDuplicate() {
     if (anyBusy) return
+    if (!canUseFeature('duplicate_invoice')) { setMenuOpen(false); setUpgradeOpen(true); return }
     setMenuOpen(false)
     setDuplicateLoading(true)
 
@@ -1144,6 +1147,8 @@ export default function InvoiceRow({
           </div>
         </div>
       )}
+
+      <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
 
       {/* Record payment modal */}
       {showRecordPayment && (
