@@ -839,18 +839,20 @@ export default function InvoiceRow({
                     />
 
                     {/* Make recurring */}
-                    <DropdownItem
-                      icon={
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="23 4 23 10 17 10"/>
-                          <polyline points="1 20 1 14 7 14"/>
-                          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                        </svg>
-                      }
-                      label="Make recurring"
-                      onClick={() => { setMenuOpen(false); setRecurringOpen(true) }}
-                      disabled={anyBusy || isDraft}
-                    />
+                    {canUseFeature('recurring_invoices') && (
+                      <DropdownItem
+                        icon={
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="23 4 23 10 17 10"/>
+                            <polyline points="1 20 1 14 7 14"/>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                          </svg>
+                        }
+                        label="Make recurring"
+                        onClick={() => { setMenuOpen(false); setRecurringOpen(true) }}
+                        disabled={anyBusy || isDraft}
+                      />
+                    )}
 
                     {/* Edit */}
                     <Link
@@ -1056,7 +1058,7 @@ export default function InvoiceRow({
         )}
 
         {/* Make recurring */}
-        {!readonly && !isDraft && (
+        {!readonly && !isDraft && canUseFeature('recurring_invoices') && (
           <button
             onClick={() => setRecurringOpen(true)}
             disabled={anyBusy}

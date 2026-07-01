@@ -13,6 +13,7 @@ const PLAN_FEATURES: Record<string, string[]> = {
     'duplicate_invoice',
     'multiple_bank_accounts',
     'remove_branding',
+    'client_directory',
   ],
   agency: [
     'email_sending',
@@ -24,6 +25,8 @@ const PLAN_FEATURES: Record<string, string[]> = {
     'team_members',
     'custom_templates',
     'advanced_analytics',
+    'client_directory',
+    'recurring_invoices',
   ],
 }
 

@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Client } from '@/lib/types'
 import { useTeam } from '@/contexts/TeamContext'
+import { useSubscription } from '@/hooks/useSubscription'
+import UpgradeModal from '@/components/UpgradeModal'
 import Link from 'next/link'
 
 const EMPTY: Partial<Client> = {
@@ -12,6 +14,8 @@ const EMPTY: Partial<Client> = {
 
 export default function ClientsPage() {
   const { effectiveUserId } = useTeam()
+  const { canUseFeature, loading: subLoading } = useSubscription()
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -113,6 +117,34 @@ export default function ClientsPage() {
     setClients(prev => prev.filter(c => c.id !== deleteId))
     setDeleteId(null)
     setDeleting(false)
+  }
+
+  if (!subLoading && !canUseFeature('client_directory')) {
+    return (
+      <>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-16 text-center">
+          <div className="w-14 h-14 rounded-full bg-brand/10 flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 mb-2">Client Directory</h2>
+          <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">
+            Store and manage client profiles with full invoice history. Available on the Pro and Agency plans.
+          </p>
+          <button
+            onClick={() => setUpgradeOpen(true)}
+            className="inline-flex px-5 py-2.5 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-dark transition-colors"
+          >
+            Upgrade to unlock
+          </button>
+        </div>
+        <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+      </>
+    )
   }
 
   const filtered = clients.filter(c =>

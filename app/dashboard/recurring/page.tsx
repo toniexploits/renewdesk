@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { RecurringInvoice } from '@/lib/types'
 import { useTeam } from '@/contexts/TeamContext'
+import { useSubscription } from '@/hooks/useSubscription'
+import UpgradeModal from '@/components/UpgradeModal'
 
 const FREQ_LABEL: Record<string, string> = {
   monthly: 'Monthly',
@@ -25,6 +27,8 @@ function fmtDate(iso: string) {
 
 export default function RecurringPage() {
   const { effectiveUserId } = useTeam()
+  const { canUseFeature, loading: subLoading } = useSubscription()
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
   const [schedules, setSchedules] = useState<RecurringInvoice[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
@@ -61,6 +65,33 @@ export default function RecurringPage() {
       setSchedules(prev => prev.map(s => s.id === id ? { ...s, status } : s))
     }
     setUpdating(null)
+  }
+
+  if (!subLoading && !canUseFeature('recurring_invoices')) {
+    return (
+      <>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-16 text-center">
+          <div className="w-14 h-14 rounded-full bg-brand/10 flex items-center justify-center mx-auto mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 mb-2">Recurring Invoices</h2>
+          <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">
+            Auto-generate invoices on a monthly, quarterly, or yearly schedule. Available on the Agency plan.
+          </p>
+          <button
+            onClick={() => setUpgradeOpen(true)}
+            className="inline-flex px-5 py-2.5 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-dark transition-colors"
+          >
+            Upgrade to unlock
+          </button>
+        </div>
+        <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+      </>
+    )
   }
 
   const active = schedules.filter(s => s.status === 'active')

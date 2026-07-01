@@ -8,10 +8,12 @@ import type { Client, Invoice, InvoiceStatus, Profile } from '@/lib/types'
 import { formatAmount } from '@/lib/format'
 import InvoiceRow from '@/components/InvoiceRow'
 import { useTeam } from '@/contexts/TeamContext'
+import { useSubscription } from '@/hooks/useSubscription'
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { effectiveUserId } = useTeam()
+  const { canUseFeature } = useSubscription()
 
   const [client, setClient] = useState<Client | null>(null)
   const [invoices, setInvoices] = useState<Invoice[]>([])
@@ -65,6 +67,15 @@ export default function ClientDetailPage() {
 
   function handleUpdate(invId: string, updates: Partial<Invoice>) {
     setInvoices(prev => prev.map(i => i.id === invId ? { ...i, ...updates } : i))
+  }
+
+  if (!canUseFeature('client_directory')) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-16 text-center">
+        <p className="text-sm text-gray-500">Client directory is available on the Pro and Agency plans.</p>
+        <Link href="/dashboard/clients" className="text-sm text-brand font-medium hover:underline mt-3 inline-block">← Back</Link>
+      </div>
+    )
   }
 
   if (loading) {
