@@ -10,6 +10,7 @@ import { formatAmount } from '@/lib/format'
 import type { Quote, QuoteStatus, Profile } from '@/lib/types'
 import { useSubscription } from '@/hooks/useSubscription'
 import UpgradeModal from './UpgradeModal'
+import { logEvent } from '@/lib/logEvent'
 
 const CLOSE_MENUS_EVENT = 'renewdesk:close-menus'
 
@@ -186,6 +187,7 @@ export default function QuoteRow({ quote, profile, onDelete, onUpdate, readonly 
     const doc     = generateQuotePDF(pdfData)
     const slug    = quote.client_name.replace(/[^a-zA-Z0-9]/g, '_') || 'Client'
     doc.save(`${quote.quote_number}-${slug}.pdf`)
+    logEvent('pdf_download')
   }
 
   async function handleWhatsApp() {
@@ -236,6 +238,7 @@ export default function QuoteRow({ quote, profile, onDelete, onUpdate, readonly 
 
     const base = phone ? `https://wa.me/${phone}` : 'https://wa.me/'
     window.open(`${base}?text=${encodeURIComponent(msgParts)}`, '_blank')
+    logEvent('whatsapp_send')
   }
 
   async function handleSendEmail() {

@@ -11,6 +11,7 @@ import DropdownPortal from '@/components/DropdownPortal'
 import RecordPaymentModal from '@/components/RecordPaymentModal'
 import UpgradeModal from '@/components/UpgradeModal'
 import { useSubscription } from '@/hooks/useSubscription'
+import { logEvent } from '@/lib/logEvent'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -359,6 +360,7 @@ export default function InvoiceRow({
       const doc = generatePDF(pdfData)
       const slug = (invoice.client_name || 'Client').replace(/[^a-zA-Z0-9]/g, '_')
       doc.save(`${invoice.inv_number}-${slug}.pdf`)
+      logEvent('pdf_download')
       markSuccess('pdf')
     } catch (err) {
       markError('pdf', err instanceof Error ? err.message : 'PDF generation failed')
@@ -486,6 +488,7 @@ export default function InvoiceRow({
 
     const base = phone ? `https://wa.me/${phone}` : 'https://wa.me/'
     window.open(`${base}?text=${encodeURIComponent(msg)}`, '_blank')
+    logEvent('whatsapp_send')
     markSuccess('whatsapp')
     setActionLoading(null)
   }

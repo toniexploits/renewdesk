@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { formatAmount } from '@/lib/format'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 interface InvoiceLineItem {
   desc: string
@@ -616,6 +618,14 @@ export async function POST(req: NextRequest) {
     if (error) {
       console.error('Resend error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Log feature usage
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const admin = createAdminClient()
+      admin.from('app_events').insert({ user_id: user.id, event_type: 'email_send' })
     }
 
     return NextResponse.json({ success: true, id: data?.id })
