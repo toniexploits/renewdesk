@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import PricingSection from '@/components/PricingSection'
 
 export const metadata = {
   title: 'RenewDesk — Renewal invoices for freelancers & agencies',
@@ -291,127 +292,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── Pricing ──────────────────────────────────────────── */}
-      <section className="py-24 px-5 sm:px-8 bg-surface" id="pricing">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight mb-3">
-              Simple, transparent pricing
-            </h2>
-            <p className="text-gray-500 text-lg">Start free. Upgrade when you need more.</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 items-start">
-
-            {/* Starter */}
-            <div className="bg-white rounded-2xl p-6 flex flex-col" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Starter</p>
-              <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-4xl font-black text-gray-900">Free</span>
-              </div>
-              <p className="text-xs text-gray-400 mb-6">Forever</p>
-              <ul className="space-y-3 mb-8 flex-1">
-                {[
-                  '5 invoices per month',
-                  '3 quotes per month',
-                  '1 bank account',
-                  'PDF download',
-                  'WhatsApp sharing',
-                ].map(f => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm text-gray-600">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5">
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/signup"
-                className="w-full py-2.5 rounded-xl text-sm font-semibold text-brand text-center hover:bg-brand/5 transition-colors"
-                style={{ border: '1.5px solid rgba(29,158,117,0.4)' }}
-              >
-                Get started free
-              </Link>
-            </div>
-
-            {/* Pro */}
-            <div
-              className="bg-white rounded-2xl p-6 flex flex-col relative"
-              style={{ border: '2px solid #1D9E75', boxShadow: '0 8px 32px rgba(29,158,117,0.12)' }}
-            >
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="bg-brand text-white text-[11px] font-bold px-3 py-1 rounded-full">Most popular</span>
-              </div>
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Pro</p>
-              <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-4xl font-black text-gray-900">₦5,000</span>
-                <span className="text-sm text-gray-400">/mo</span>
-              </div>
-              <p className="text-xs text-gray-400 mb-6">or ₦45,000/yr · save 3 months</p>
-              <ul className="space-y-3 mb-8 flex-1">
-                {[
-                  'Unlimited invoices & quotes',
-                  'Email sending with PDF attachment',
-                  'Duplicate invoice',
-                  'Up to 5 bank accounts',
-                  'Remove RenewDesk branding',
-                  'Client directory',
-                ].map(f => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm text-gray-600">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5">
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/signup"
-                className="w-full py-2.5 rounded-xl text-sm font-semibold text-white bg-brand text-center hover:bg-brand-dark transition-colors"
-              >
-                Start with Pro
-              </Link>
-            </div>
-
-            {/* Agency */}
-            <div className="bg-white rounded-2xl p-6 flex flex-col" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Agency</p>
-              <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-4xl font-black text-gray-900">₦15,000</span>
-                <span className="text-sm text-gray-400">/mo</span>
-              </div>
-              <p className="text-xs text-gray-400 mb-6">or ₦135,000/yr · save 3 months</p>
-              <ul className="space-y-3 mb-8 flex-1">
-                {[
-                  'Everything in Pro',
-                  'Up to 10 bank accounts',
-                  'Team members',
-                  'Recurring invoices',
-                  'Custom email sender name',
-                ].map(f => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm text-gray-600">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5">
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/signup"
-                className="w-full py-2.5 rounded-xl text-sm font-semibold text-gray-700 text-center hover:bg-gray-50 transition-colors"
-                style={{ border: '1px solid rgba(0,0,0,0.12)' }}
-              >
-                Start with Agency
-              </Link>
-            </div>
-
-          </div>
-          <p className="text-center text-xs text-gray-400 mt-6">
-            USD pricing also available · Secure payments via Paystack · Cancel anytime
-          </p>
-        </div>
-      </section>
+      <PricingSection />
 
       {/* ── Final CTA ────────────────────────────────────────── */}
       <section className="py-24 px-5 sm:px-8 bg-white">
