@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Client, Invoice, InvoiceStatus, Profile } from '@/lib/types'
@@ -11,7 +11,6 @@ import { useTeam } from '@/contexts/TeamContext'
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const router = useRouter()
   const { effectiveUserId } = useTeam()
 
   const [client, setClient] = useState<Client | null>(null)
