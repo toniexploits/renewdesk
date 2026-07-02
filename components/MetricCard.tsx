@@ -20,7 +20,7 @@ export default function MetricCard({ label, value, sub, green }: MetricCardProps
         {label}
       </p>
       <p
-        className={`mt-1 text-2xl font-bold leading-tight ${
+        className={`mt-1 text-lg sm:text-2xl font-bold leading-tight break-words ${
           green ? 'text-brand' : 'text-gray-900'
         }`}
       >

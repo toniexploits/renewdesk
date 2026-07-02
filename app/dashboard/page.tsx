@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import MetricCard from '@/components/MetricCard'
 import InvoiceRow from '@/components/InvoiceRow'
 import UpgradeDetector from '@/components/dashboard/UpgradeDetector'
-import { formatAmount } from '@/lib/format'
+import { formatAmountShort } from '@/lib/format'
 import { getEffectiveUserId } from '@/lib/team'
 import type { Invoice } from '@/lib/types'
 
@@ -89,12 +89,12 @@ export default async function DashboardPage({
         <MetricCard label="Total invoices" value={totalCount} />
         <MetricCard
           label="Outstanding"
-          value={formatAmount(outstanding, currency)}
+          value={formatAmountShort(outstanding, currency)}
           sub="Pending + overdue"
         />
         <MetricCard
           label="Collected"
-          value={formatAmount(collected, currency)}
+          value={formatAmountShort(collected, currency)}
           sub="All paid invoices"
           green
         />

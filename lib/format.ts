@@ -19,6 +19,12 @@ export function formatAmount(amount: number, currency: string): string {
   return sym + Number(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
+// For dashboard metric cards — no decimals, saves space on mobile
+export function formatAmountShort(amount: number, currency: string): string {
+  const sym = getCurrencySymbol(currency)
+  return sym + Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
 export const CURRENCY_OPTIONS: { value: Currency; label: string }[] = [
   { value: 'NGN', label: 'NGN — ₦ Nigerian Naira' },
   { value: 'USD', label: 'USD — $ US Dollar' },
