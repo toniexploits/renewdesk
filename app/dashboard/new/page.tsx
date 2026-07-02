@@ -7,7 +7,13 @@ import { getEffectiveUserId } from '@/lib/team'
 export default async function NewRenewalPage({
   searchParams,
 }: {
-  searchParams: { edit?: string }
+  searchParams: {
+    edit?: string
+    client_name?: string
+    client_email?: string
+    client_phone?: string
+    contact_name?: string
+  }
 }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -47,6 +53,12 @@ export default async function NewRenewalPage({
         invoice={invoice as Invoice | null}
         bankAccounts={(bankAccounts as BankAccount[] | null) ?? []}
         usage={usage}
+        prefill={searchParams.client_name ? {
+          clientName: searchParams.client_name,
+          clientEmail: searchParams.client_email ?? '',
+          clientPhone: searchParams.client_phone ?? '',
+          contactName: searchParams.contact_name ?? '',
+        } : undefined}
       />
     </div>
   )

@@ -360,9 +360,10 @@ interface Props {
   invoice?: Invoice | null
   bankAccounts: BankAccount[]
   usage?: UsageResult
+  prefill?: { clientName?: string; clientEmail?: string; clientPhone?: string; contactName?: string }
 }
 
-export default function NewRenewalForm({ profile, invoice, bankAccounts, usage }: Props) {
+export default function NewRenewalForm({ profile, invoice, bankAccounts, usage, prefill }: Props) {
   const { removeBranding, canUseFeature } = useSubscription()
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [upgradeOpen, setUpgradeOpen] = useState(false)
@@ -384,10 +385,10 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts, usage }
   const [emailFeedback, setEmailFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const [form, setForm] = useState<FormData>({
-    clientName: invoice?.client_name ?? '',
-    contactName: invoice?.contact_name ?? '',
-    clientEmail: invoice?.client_email ?? '',
-    clientPhone: invoice?.client_phone ?? '',
+    clientName: invoice?.client_name ?? prefill?.clientName ?? '',
+    contactName: invoice?.contact_name ?? prefill?.contactName ?? '',
+    clientEmail: invoice?.client_email ?? prefill?.clientEmail ?? '',
+    clientPhone: invoice?.client_phone ?? prefill?.clientPhone ?? '',
     serviceName: invoice?.service_name ?? '',
     servicePlan: invoice?.service_plan ?? '',
     renewalDate: invoice?.renewal_date ?? '',
@@ -550,7 +551,20 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts, usage }
           .select('id')
           .single()
         if (error) { setSaveError(error.message); return }
-        if (data) setSavedInvoiceId(data.id)
+        if (data) {
+          setSavedInvoiceId(data.id)
+          // Auto-upsert client — fire and forget
+          if (form.clientName.trim()) {
+            supabase.from('clients').upsert({
+              user_id: user.id,
+              name: form.clientName.trim(),
+              email: form.clientEmail || null,
+              phone: form.clientPhone || null,
+              contact_name: form.contactName || null,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id,name' }).then(() => {})
+          }
+        }
       }
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Unexpected error. Please try again.')

@@ -163,7 +163,7 @@ export default function ClientDetailPage() {
             )}
           </div>
           <Link
-            href="/dashboard/new"
+            href={`/dashboard/new?client_name=${encodeURIComponent(client?.name ?? '')}&client_email=${encodeURIComponent(client?.email ?? '')}&client_phone=${encodeURIComponent(client?.phone ?? '')}&contact_name=${encodeURIComponent(client?.contact_name ?? '')}`}
             className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-brand text-white text-xs font-medium rounded-lg hover:bg-brand-dark transition-colors"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
