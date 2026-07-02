@@ -1228,12 +1228,12 @@ export default function InvoiceRow({
               <p className="text-sm font-medium text-gray-900">
                 {paymentReceiptData.isFullyPaid
                   ? 'Invoice fully paid — receipt ready'
-                  : `Payment recorded — ${formatAmountShort(paymentReceiptData.payment.amount, invoice.currency ?? 'NGN')} received`
+                  : `Payment recorded — ${formatAmount(paymentReceiptData.payment.amount, invoice.currency ?? 'NGN')} received`
                 }
               </p>
               {!paymentReceiptData.isFullyPaid && (
                 <p className="text-xs text-amber-600 mt-0.5">
-                  Balance: {formatAmountShort(invoice.total - paymentReceiptData.newAmountPaid, invoice.currency ?? 'NGN')}
+                  Balance: {formatAmount(invoice.total - paymentReceiptData.newAmountPaid, invoice.currency ?? 'NGN')}
                 </p>
               )}
               <div className="flex gap-2 mt-2.5">
