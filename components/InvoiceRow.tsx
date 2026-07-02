@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Invoice, InvoiceStatus, Payment, Profile } from '@/lib/types'
-import { formatAmount } from '@/lib/format'
+import { formatAmount, formatAmountShort } from '@/lib/format'
 import StatusBadge from '@/components/StatusBadge'
 import { generatePDF, invoiceToPDFData, fetchLogoDataUrl } from '@/lib/generatePDF'
 import DropdownPortal from '@/components/DropdownPortal'
@@ -748,7 +748,7 @@ export default function InvoiceRow({
               {invoice.inv_number}
             </span>
             {isPaid    && <span className="text-[10px] font-medium text-gray-400 leading-tight">Receipt</span>}
-            {isPartial && <span className="text-[10px] font-medium text-sky-600 leading-tight">Balance: {formatAmount(balance, invoice.currency ?? 'NGN')}</span>}
+            {isPartial && <span className="text-[10px] font-medium text-sky-600 leading-tight">Balance: {formatAmountShort(balance, invoice.currency ?? 'NGN')}</span>}
           </div>
 
           <div
@@ -756,7 +756,7 @@ export default function InvoiceRow({
             onClick={(e) => e.stopPropagation()}
           >
             <span className="text-[15px] font-bold text-gray-900 tabular-nums">
-              {formatAmount(invoice.total, invoice.currency ?? 'NGN')}
+              {formatAmountShort(invoice.total, invoice.currency ?? 'NGN')}
             </span>
 
             {!readonly && (
@@ -969,11 +969,11 @@ export default function InvoiceRow({
         {/* Total */}
         <div className="w-24 text-right flex-shrink-0">
           <p className="text-sm font-semibold text-gray-900">
-            {formatAmount(invoice.total, invoice.currency ?? 'NGN')}
+            {formatAmountShort(invoice.total, invoice.currency ?? 'NGN')}
           </p>
           {isPartial && (
             <p className="text-[10px] text-amber-600 mt-0.5 tabular-nums">
-              bal {formatAmount(balance, invoice.currency ?? 'NGN')}
+              bal {formatAmountShort(balance, invoice.currency ?? 'NGN')}
             </p>
           )}
         </div>
@@ -1228,12 +1228,12 @@ export default function InvoiceRow({
               <p className="text-sm font-medium text-gray-900">
                 {paymentReceiptData.isFullyPaid
                   ? 'Invoice fully paid — receipt ready'
-                  : `Payment recorded — ${formatAmount(paymentReceiptData.payment.amount, invoice.currency ?? 'NGN')} received`
+                  : `Payment recorded — ${formatAmountShort(paymentReceiptData.payment.amount, invoice.currency ?? 'NGN')} received`
                 }
               </p>
               {!paymentReceiptData.isFullyPaid && (
                 <p className="text-xs text-amber-600 mt-0.5">
-                  Balance: {formatAmount(invoice.total - paymentReceiptData.newAmountPaid, invoice.currency ?? 'NGN')}
+                  Balance: {formatAmountShort(invoice.total - paymentReceiptData.newAmountPaid, invoice.currency ?? 'NGN')}
                 </p>
               )}
               <div className="flex gap-2 mt-2.5">

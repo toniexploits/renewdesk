@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Invoice, InvoiceStatus, Profile } from '@/lib/types'
-import { formatAmount } from '@/lib/format'
+import { formatAmountShort } from '@/lib/format'
 import InvoiceRow from '@/components/InvoiceRow'
 import { useTeam } from '@/contexts/TeamContext'
 
@@ -140,8 +140,8 @@ export default function InvoicesPage() {
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
             <StatCard label="Total" value={String(invoices.length)} />
-            <StatCard label="Outstanding" value={formatAmount(outstanding, currency)} />
-            <StatCard label="Collected" value={formatAmount(collected, currency)} green />
+            <StatCard label="Outstanding" value={formatAmountShort(outstanding, currency)} />
+            <StatCard label="Collected" value={formatAmountShort(collected, currency)} green />
             <StatCard label="Overdue" value={String(overdueCount)} />
           </div>
 
