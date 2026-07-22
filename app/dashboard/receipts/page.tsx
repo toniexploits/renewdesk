@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Invoice, InvoiceStatus, Profile } from '@/lib/types'
-import { formatAmount } from '@/lib/format'
+import { formatAmountShort } from '@/lib/format'
 import InvoiceRow from '@/components/InvoiceRow'
 import { useTeam } from '@/contexts/TeamContext'
 
@@ -98,7 +98,7 @@ export default function ReceiptsPage() {
   }, [receipts, search])
 
   // Metrics
-  const currency = receipts[0]?.currency ?? 'NGN'
+  const currency = profile?.currency ?? 'NGN'
   const totalCollected = receipts.reduce((s, r) => s + r.total, 0)
   const thisMonthCollected = useMemo(() => {
     const now = new Date()
@@ -126,8 +126,8 @@ export default function ReceiptsPage() {
       {!loading && receipts.length > 0 && (
         <div className="grid grid-cols-3 gap-3 mb-3">
           <StatCard label="Receipts" value={String(receipts.length)} />
-          <StatCard label="Collected" value={formatAmount(totalCollected, currency)} green />
-          <StatCard label="This month" value={formatAmount(thisMonthCollected, currency)} />
+          <StatCard label="Collected" value={formatAmountShort(totalCollected, currency)} green />
+          <StatCard label="This month" value={formatAmountShort(thisMonthCollected, currency)} />
         </div>
       )}
 
