@@ -655,12 +655,20 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts, usage, 
       setWhatsappError('Could not generate PDF. WhatsApp message sent without PDF link.')
     }
 
+    const isRenewal = !!form.renewalDate
+    const introLine = isRenewal
+      ? `This is a renewal reminder from *${biz}*.`
+      : `Please find your invoice from *${biz}* below.`
+    const contextLine = isRenewal
+      ? `Your *${svc}${plan}* is due for renewal on *${dueFmt}*.`
+      : `Service: *${svc}${plan}*`
+
     const msgParts = [
       `Hello ${form.clientName || 'there'},`,
       ``,
-      `This is a renewal reminder from *${biz}*.`,
+      introLine,
       ``,
-      `Your *${svc}${plan}* is due for renewal${dueFmt ? ` on *${dueFmt}*` : ''}.`,
+      contextLine,
       ``,
       `Invoice total: *${formatAmount(grand, form.currency)}*`,
       ``,

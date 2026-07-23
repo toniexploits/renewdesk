@@ -51,7 +51,7 @@ function buildEmailHtml(d: InvoiceData, recipientEmail: string): string {
     ? new Date(d.renewalDate + 'T00:00:00').toLocaleDateString('en-GB', {
         day: '2-digit', month: 'short', year: 'numeric',
       })
-    : 'Upon renewal'
+    : 'Upon receipt'
 
   const today = new Date().toLocaleDateString('en-GB', {
     day: '2-digit', month: 'short', year: 'numeric',
