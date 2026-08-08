@@ -157,7 +157,7 @@ export default function DeveloperPage() {
       {/* Base URL info */}
       <div className="rounded-xl border border-gray-200 bg-gray-50 px-5 py-4">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Base URL</p>
-        <code className="text-sm text-gray-800 font-mono">https://renewdesk.vercel.app/api/v1</code>
+        <code className="text-sm text-gray-800 font-mono">https://renewdeskapp.com/api/v1</code>
         <p className="text-xs text-gray-500 mt-2">
           Authenticate with <code className="bg-gray-200 px-1 py-0.5 rounded text-xs">Authorization: Bearer rdk_live_…</code> header.
           {' '}<a href="/api-docs" className="text-brand underline" target="_blank">View full API docs →</a>

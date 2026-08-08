@@ -35,7 +35,7 @@ const endpoints: Endpoint[] = [
       { name: 'page', type: 'number', description: 'Page number (default: 1)' },
       { name: 'limit', type: 'number', description: 'Results per page, max 100 (default: 20)' },
     ],
-    example: `curl https://renewdesk.vercel.app/api/v1/invoices \\
+    example: `curl https://renewdeskapp.com/api/v1/invoices \\
   -H "Authorization: Bearer rdk_live_…"`,
   },
   {
@@ -52,7 +52,7 @@ const endpoints: Endpoint[] = [
       { name: 'currency', type: 'string', description: 'Currency code, e.g. NGN, USD (defaults to profile)' },
       { name: 'notes', type: 'string', description: 'Additional notes' },
     ],
-    example: `curl -X POST https://renewdesk.vercel.app/api/v1/invoices \\
+    example: `curl -X POST https://renewdeskapp.com/api/v1/invoices \\
   -H "Authorization: Bearer rdk_live_…" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -66,7 +66,7 @@ const endpoints: Endpoint[] = [
   {
     method: 'GET', path: '/api/v1/invoices/:id', summary: 'Get invoice',
     scopes: ['invoices:read'],
-    example: `curl https://renewdesk.vercel.app/api/v1/invoices/uuid \\
+    example: `curl https://renewdeskapp.com/api/v1/invoices/uuid \\
   -H "Authorization: Bearer rdk_live_…"`,
   },
   {
@@ -119,7 +119,7 @@ const endpoints: Endpoint[] = [
   {
     method: 'POST', path: '/api/v1/quotes/:id/convert', summary: 'Convert quote to invoice',
     scopes: ['quotes:write', 'invoices:write'],
-    example: `curl -X POST https://renewdesk.vercel.app/api/v1/quotes/uuid/convert \\
+    example: `curl -X POST https://renewdeskapp.com/api/v1/quotes/uuid/convert \\
   -H "Authorization: Bearer rdk_live_…"`,
   },
   {
@@ -134,7 +134,7 @@ const endpoints: Endpoint[] = [
   {
     method: 'GET', path: '/api/v1/clients/:email', summary: 'Get client with invoice summary',
     scopes: ['clients:read'],
-    example: `curl "https://renewdesk.vercel.app/api/v1/clients/billing%40acme.com" \\
+    example: `curl "https://renewdeskapp.com/api/v1/clients/billing%40acme.com" \\
   -H "Authorization: Bearer rdk_live_…"`,
   },
 ]
@@ -150,7 +150,7 @@ export default function ApiDocsPage() {
       {/* Header */}
       <div className="border-b border-gray-100 bg-gray-50">
         <div className="max-w-4xl mx-auto px-6 py-8">
-          <Link href="/" className="text-sm text-gray-400 hover:text-gray-600 mb-4 inline-block">← renewdesk.vercel.app</Link>
+          <Link href="/" className="text-sm text-gray-400 hover:text-gray-600 mb-4 inline-block">← renewdeskapp.com</Link>
           <h1 className="text-2xl font-bold text-gray-900">API Reference</h1>
           <p className="text-gray-500 mt-1 text-sm">
             REST API for invoices, quotes, and clients. Available on Pro and Agency plans.
@@ -158,7 +158,7 @@ export default function ApiDocsPage() {
           <div className="mt-4 flex items-center gap-3">
             <span className="text-xs font-medium bg-brand text-white px-2 py-1 rounded">v1</span>
             <code className="text-xs text-gray-600 bg-gray-200 px-2 py-1 rounded font-mono">
-              https://renewdesk.vercel.app/api/v1
+              https://renewdeskapp.com/api/v1
             </code>
           </div>
         </div>
