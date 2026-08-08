@@ -141,6 +141,30 @@ export default async function AdminAnalyticsPage() {
   const eventCounts = new Map<string, number>()
   allEv.forEach(e => eventCounts.set(e.event_type, (eventCounts.get(e.event_type) ?? 0) + 1))
 
+  // API analytics
+  const [
+    { data: apiLogs },
+    { data: apiKeys },
+  ] = await Promise.all([
+    admin.from('api_requests_log').select('endpoint, method, status_code, duration_ms, created_at').order('created_at', { ascending: false }).limit(5000),
+    admin.from('api_keys').select('id, is_active').eq('is_active', true),
+  ])
+
+  const allLogs   = (apiLogs ?? []) as { endpoint: string; method: string; status_code: number; duration_ms: number; created_at: string }[]
+  const activeKeys = (apiKeys ?? []).length
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const apiToday   = allLogs.filter(l => new Date(l.created_at) >= today).length
+  const apiTotal   = allLogs.length
+  const apiErrors  = allLogs.filter(l => l.status_code >= 400).length
+  const apiSucc    = apiTotal > 0 ? pct(apiTotal - apiErrors, apiTotal) : '—'
+  const avgDuration = allLogs.length > 0 ? Math.round(allLogs.reduce((s, l) => s + l.duration_ms, 0) / allLogs.length) : 0
+
+  const endpointCounts = new Map<string, number>()
+  allLogs.forEach(l => endpointCounts.set(l.endpoint, (endpointCounts.get(l.endpoint) ?? 0) + 1))
+  const topEndpoints = Array.from(endpointCounts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5)
+
   const statCard = (label: string, value: string | number, sub?: string, green?: boolean) => (
     <div className="bg-white rounded-xl px-4 py-4" style={{ border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
       <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">{label}</p>
@@ -223,6 +247,47 @@ export default async function AdminAnalyticsPage() {
         {allEv.length === 0 && (
           <p className="text-xs text-gray-400 mt-3">
             Feature tracking events will appear here once the <code className="font-mono bg-gray-100 px-1 py-0.5 rounded">app_events</code> table is populated.
+          </p>
+        )}
+      </section>
+
+      {/* Section 5 — API analytics */}
+      <section>
+        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-widest mb-4">API Usage</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          {statCard('Requests today',   apiToday,   undefined, apiToday > 0)}
+          {statCard('Total requests',   apiTotal)}
+          {statCard('Active keys',      activeKeys, undefined, activeKeys > 0)}
+          {statCard('Success rate',     apiSucc,    `${apiErrors} errors · avg ${avgDuration}ms`)}
+        </div>
+
+        {topEndpoints.length > 0 && (
+          <div className="bg-white rounded-xl overflow-hidden" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
+            <div className="px-5 py-3" style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+              <p className="text-sm font-semibold text-gray-700">Top Endpoints</p>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.06)', background: '#FAFAFA' }}>
+                  <th className="text-left px-5 py-2 text-[11px] font-semibold uppercase tracking-widest text-gray-400">Endpoint</th>
+                  <th className="text-right px-5 py-2 text-[11px] font-semibold uppercase tracking-widest text-gray-400">Requests</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/[0.03]">
+                {topEndpoints.map(([ep, count], i) => (
+                  <tr key={ep} style={i % 2 === 1 ? { background: '#FAFAFA' } : {}}>
+                    <td className="px-5 py-2.5 font-mono text-xs text-gray-700">{ep}</td>
+                    <td className="px-5 py-2.5 text-right font-semibold text-brand">{count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {apiTotal === 0 && (
+          <p className="text-xs text-gray-400 mt-3">
+            API request logs will appear here once users start making API calls.
           </p>
         )}
       </section>

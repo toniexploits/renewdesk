@@ -3,14 +3,8 @@
     "allow": [
       "Bash(npx tsc:*)",
       "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\({...p.dependencies,...p.devDependencies}, null, 2\\)\\)\")",
-      "Bash(npm run:*)",
-      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\USER\\\\renewdesk\" -Force)",
-      "Bash(Select-Object Name, PSIsContainer)",
-      "Bash(Format-Table -AutoSize)",
-      "Bash(npm install *)",
-      "Bash(node -e \"require\\('./node_modules/recharts/package.json'\\).version\")",
-      "Bash(node *)",
-      "Bash(npx next *)"
+      "Bash(npm run:*)"
     ]
   }
 }
+
