@@ -356,7 +356,7 @@ function isValid(secret, rawBody, header) {
         <div className="border-t border-gray-100 pt-8 pb-4 text-center">
           <p className="text-sm text-gray-400">
             Need help?{' '}
-            <a href="mailto:support@renewdesk.co" className="text-brand hover:underline">support@renewdesk.co</a>
+            <a href="mailto:support@renewdeskapp.com" className="text-brand hover:underline">support@renewdeskapp.com</a>
             {' · '}
             <Link href="/dashboard/settings/developer" className="text-brand hover:underline">Generate API key →</Link>
           </p>
