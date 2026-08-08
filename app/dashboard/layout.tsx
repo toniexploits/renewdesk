@@ -49,7 +49,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="min-h-screen bg-surface">
         <Sidebar />
         <Topbar displayName={displayName} initials={initials} />
-        <main className="md:ml-56 pt-14 pb-20 md:pb-0 min-h-screen">
+        <main className="md:ml-56 pt-14 min-h-screen">
           {ownerId && (
             <div
               className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-sky-800 bg-sky-50"
