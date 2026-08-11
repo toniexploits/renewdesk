@@ -20,7 +20,7 @@ export async function GET() {
   if (authErr || !user) return apiError('Unauthorized', 'UNAUTHORIZED', 401)
 
   const admin = createAdminClient()
-  const { data, error: dbErr } = await admin.from('api_keys').select('id,name,prefix,last_four,scopes,created_at,last_used_at,expires_at,is_active')
+  const { data, error: dbErr } = await admin.from('api_keys').select('id,name,key_prefix,last_four,scopes,created_at,last_used_at,expires_at,is_active')
     .eq('user_id', user.id).order('created_at', { ascending: false })
   if (dbErr) return apiError(dbErr.message, 'DATABASE_ERROR', 500)
 
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     scopes:    effectiveScopes,
     expires_at: expiresAt,
     is_active: true,
-  }).select('id,name,prefix,last_four,scopes,created_at,expires_at').single()
+  }).select('id,name,key_prefix,last_four,scopes,created_at,expires_at').single()
 
   if (dbErr) return apiError(dbErr.message, 'DATABASE_ERROR', 500)
 
