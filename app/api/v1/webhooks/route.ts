@@ -51,8 +51,8 @@ export async function POST(request: NextRequest) {
 
   // Check plan allows webhooks
   const admin = createAdminClient()
-  const { data: sub } = await admin.from('subscriptions').select('plan').eq('user_id', user.id).maybeSingle()
-  const plan = sub?.plan ?? 'starter'
+  const { data: sub } = await admin.from('user_subscriptions').select('plan_name').eq('user_id', user.id).maybeSingle()
+  const plan = sub?.plan_name ?? 'starter'
   if (plan === 'starter') {
     return apiError('Webhooks require a Pro or Agency plan', 'PLAN_REQUIRED', 403)
   }
