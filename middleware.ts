@@ -38,6 +38,8 @@ export async function middleware(request: NextRequest) {
     || pathname === '/'
     || pathname === '/upgrade'
     || pathname.startsWith('/accept-invite')
+    || pathname.startsWith('/api/v1')
+    || pathname.startsWith('/api-docs')
   const isAdminRoute  = pathname.startsWith('/rd-admin')
 
   if (isAuthRoute && user) {
