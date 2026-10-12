@@ -81,6 +81,8 @@ const endpoints: Endpoint[] = [
       { name: 'notes', type: 'string', description: 'Update notes' },
       { name: 'line_items', type: 'array', description: 'Replace line items (totals recalculated)' },
       { name: 'renewal_date', type: 'ISO date', description: 'Update renewal date' },
+      { name: 'discount_type', type: 'string', description: 'percent | fixed (totals recalculated; omit to keep current)' },
+      { name: 'discount_value', type: 'number', description: 'New discount value (totals recalculated; 0 removes the discount; max 100 for percent)' },
     ],
   },
   {

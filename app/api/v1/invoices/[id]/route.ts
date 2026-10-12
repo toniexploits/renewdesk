@@ -55,21 +55,44 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if (key in body) updates[key] = body[key]
   }
 
-  // Recalculate totals if line_items updated
-  if (updates.line_items && Array.isArray(updates.line_items)) {
-    const items = (updates.line_items as Array<Record<string,unknown>>).map((i, idx) => ({
-      id:    i.id ?? `${Date.now()}-${idx}`,
-      desc:  String(i.desc ?? i.description ?? ''),
-      qty:   Number(i.qty ?? 1),
-      price: Number(i.price ?? i.unit_price ?? 0),
-    }))
-    updates.line_items = items
-    const subtotal  = items.reduce((s, i) => s + i.qty * i.price, 0)
-    const ex        = existing as Record<string, unknown>
+  // Discount: omitted fields keep their saved values
+  const ex = existing as Record<string, unknown>
+  const { discount_type, discount_value } = body
+  if (discount_type !== undefined && discount_type !== 'percent' && discount_type !== 'fixed') {
+    return apiError("discount_type must be 'percent' or 'fixed'", 'VALIDATION_ERROR', 400)
+  }
+  if (discount_value !== undefined && (typeof discount_value !== 'number' || !Number.isFinite(discount_value) || discount_value < 0)) {
+    return apiError('discount_value must be a non-negative number', 'VALIDATION_ERROR', 400)
+  }
+  const discountType: DiscountType = (discount_type ?? ex.discount_type ?? 'percent') === 'fixed' ? 'fixed' : 'percent'
+  const discountValue = discount_value !== undefined ? (discount_value as number) : Number(ex.discount_value ?? 0)
+  if (discountType === 'percent' && discountValue > 100) {
+    return apiError('discount_value cannot exceed 100 for a percent discount', 'VALIDATION_ERROR', 400)
+  }
+
+  if (updates.line_items !== undefined && !Array.isArray(updates.line_items)) {
+    return apiError('line_items must be an array', 'VALIDATION_ERROR', 400)
+  }
+
+  // Recalculate totals if line_items or discount updated
+  if (Array.isArray(updates.line_items) || discount_type !== undefined || discount_value !== undefined) {
+    let subtotal = Number(ex.subtotal ?? 0)
+    if (Array.isArray(updates.line_items)) {
+      const items = (updates.line_items as Array<Record<string,unknown>>).map((i, idx) => ({
+        id:    i.id ?? `${Date.now()}-${idx}`,
+        desc:  String(i.desc ?? i.description ?? ''),
+        qty:   Number(i.qty ?? 1),
+        price: Number(i.price ?? i.unit_price ?? 0),
+      }))
+      updates.line_items = items
+      subtotal = items.reduce((s, i) => s + i.qty * i.price, 0)
+    }
     const taxRate   = (ex.tax_rate as number) ?? 7.5
-    const discount  = calcDiscount(subtotal, (ex.discount_type as DiscountType) ?? 'percent', Number(ex.discount_value ?? 0))
+    const discount  = calcDiscount(subtotal, discountType, discountValue)
     const taxAmount = ((subtotal - discount) * taxRate) / 100
     updates.subtotal        = subtotal
+    updates.discount_type   = discountType
+    updates.discount_value  = discount > 0 ? discountValue : 0
     updates.discount_amount = discount
     updates.tax_amount      = taxAmount
     updates.total           = subtotal - discount + taxAmount
