@@ -5,6 +5,8 @@ import {
   handleOptions, logRequest, withRateLimitHeaders,
 } from '@/lib/apiMiddleware'
 import { triggerWebhook } from '@/lib/webhooks'
+import { calcDiscount } from '@/lib/format'
+import type { DiscountType } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,11 +65,21 @@ export async function POST(request: NextRequest) {
     client_name, client_email, client_phone, contact_name,
     service_name, service_plan, renewal_date, notes,
     line_items, tax_rate, bank_account_id, currency,
+    discount_type, discount_value,
   } = body
 
   if (!client_name) return apiError('client_name is required', 'VALIDATION_ERROR', 400)
   if (!Array.isArray(line_items) || line_items.length === 0) {
     return apiError('line_items must be a non-empty array', 'VALIDATION_ERROR', 400)
+  }
+  if (discount_type !== undefined && discount_type !== 'percent' && discount_type !== 'fixed') {
+    return apiError("discount_type must be 'percent' or 'fixed'", 'VALIDATION_ERROR', 400)
+  }
+  if (discount_value !== undefined && (typeof discount_value !== 'number' || !Number.isFinite(discount_value) || discount_value < 0)) {
+    return apiError('discount_value must be a non-negative number', 'VALIDATION_ERROR', 400)
+  }
+  if (discount_type !== 'fixed' && typeof discount_value === 'number' && discount_value > 100) {
+    return apiError('discount_value cannot exceed 100 for a percent discount', 'VALIDATION_ERROR', 400)
   }
 
   const admin = createAdminClient()
@@ -83,9 +95,11 @@ export async function POST(request: NextRequest) {
     price: Number(item.unit_price ?? item.price ?? 0),
   }))
 
-  const subtotal  = items.reduce((s, i) => s + i.qty * i.price, 0)
-  const taxAmount = (subtotal * effectiveTaxRate) / 100
-  const total     = subtotal + taxAmount
+  const discountType: DiscountType = discount_type === 'fixed' ? 'fixed' : 'percent'
+  const subtotal       = items.reduce((s, i) => s + i.qty * i.price, 0)
+  const discountAmount = calcDiscount(subtotal, discountType, (discount_value as number) ?? 0)
+  const taxAmount      = ((subtotal - discountAmount) * effectiveTaxRate) / 100
+  const total          = subtotal - discountAmount + taxAmount
 
   const { data: invoice, error: dbErr } = await admin.from('invoices').insert({
     user_id:          auth.userId,
@@ -100,6 +114,9 @@ export async function POST(request: NextRequest) {
     notes:            (notes as string)          || null,
     line_items:       items,
     subtotal,
+    discount_type:    discountType,
+    discount_value:   discountAmount > 0 ? (discount_value as number) : 0,
+    discount_amount:  discountAmount,
     tax_rate:         effectiveTaxRate,
     tax_amount:       taxAmount,
     total,

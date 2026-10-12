@@ -49,6 +49,8 @@ const endpoints: Endpoint[] = [
       { name: 'service_name', type: 'string', description: 'Service name' },
       { name: 'renewal_date', type: 'ISO date', description: 'Renewal/due date (omit for one-time invoices)' },
       { name: 'tax_rate', type: 'number', description: 'Tax rate % (defaults to your profile rate)' },
+      { name: 'discount_type', type: 'string', description: 'percent | fixed (default: percent)' },
+      { name: 'discount_value', type: 'number', description: 'Discount applied to the subtotal before tax, e.g. 10 for 10% or 5000 for a fixed amount (max 100 for percent; a fixed discount is capped at the subtotal)' },
       { name: 'currency', type: 'string', description: 'Currency code, e.g. NGN, USD (defaults to profile)' },
       { name: 'notes', type: 'string', description: 'Additional notes' },
     ],
@@ -60,6 +62,8 @@ const endpoints: Endpoint[] = [
     "client_email": "billing@acme.com",
     "service_name": "Web Hosting",
     "line_items": [{"description":"Annual plan","qty":1,"unit_price":50000}],
+    "discount_type": "percent",
+    "discount_value": 10,
     "renewal_date": "2027-01-01"
   }'`,
   },
