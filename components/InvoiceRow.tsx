@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Invoice, InvoiceStatus, Payment, Profile } from '@/lib/types'
-import { formatAmount, formatAmountShort } from '@/lib/format'
+import { formatAmount, formatAmountShort, discountLabel } from '@/lib/format'
 import StatusBadge from '@/components/StatusBadge'
 import { generatePDF, invoiceToPDFData, fetchLogoDataUrl } from '@/lib/generatePDF'
 import DropdownPortal from '@/components/DropdownPortal'
@@ -529,6 +529,8 @@ export default function InvoiceRow({
             taxRate: invoice.tax_rate,
             items: Array.isArray(invoice.line_items) ? invoice.line_items : [],
             subtotal: invoice.subtotal,
+            discountAmount: invoice.discount_amount ?? 0,
+            discountLabel: discountLabel(invoice.discount_type, invoice.discount_value),
             taxAmount: invoice.tax_amount,
             grand: invoice.total,
             amountPaid: invoice.amount_paid ?? 0,
@@ -591,6 +593,9 @@ export default function InvoiceRow({
         renewal_date: newRenewalDate,
         line_items: invoice.line_items,
         subtotal: invoice.subtotal,
+        discount_type: invoice.discount_type ?? 'percent',
+        discount_value: invoice.discount_value ?? 0,
+        discount_amount: invoice.discount_amount ?? 0,
         tax_rate: invoice.tax_rate,
         tax_amount: invoice.tax_amount,
         total: invoice.total,

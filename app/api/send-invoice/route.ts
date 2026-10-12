@@ -24,6 +24,8 @@ interface InvoiceData {
   taxRate: number
   items: InvoiceLineItem[]
   subtotal: number
+  discountAmount?: number
+  discountLabel?: string
   taxAmount: number
   grand: number
   amountPaid?: number      // for partial receipts
@@ -42,6 +44,16 @@ interface SendInvoiceRequest {
   invoiceData: InvoiceData
   recipientEmail: string
   pdfBase64: string
+}
+
+// Discount row for the totals table — empty when no discount applies
+function discountRow(d: InvoiceData): string {
+  if (!d.discountAmount || d.discountAmount <= 0) return ''
+  const label = String(d.discountLabel ?? 'Discount').replace(/[<>&"]/g, '')
+  return `<tr>
+                  <td style="padding:4px 12px;font-size:13px;color:#6b6b67;">${label}</td>
+                  <td style="padding:4px 12px;font-size:13px;color:#6b6b67;text-align:right;">-${formatAmount(d.discountAmount, d.currency)}</td>
+                </tr>`
 }
 
 // ─── Invoice email ────────────────────────────────────────────────────────────
@@ -152,6 +164,7 @@ function buildEmailHtml(d: InvoiceData, recipientEmail: string): string {
                   <td style="padding:4px 12px;font-size:13px;color:#6b6b67;">Subtotal</td>
                   <td style="padding:4px 12px;font-size:13px;color:#6b6b67;text-align:right;">${formatAmount(d.subtotal, d.currency)}</td>
                 </tr>
+                ${discountRow(d)}
                 <tr>
                   <td style="padding:4px 12px;font-size:13px;color:#6b6b67;">Tax (${d.taxRate}%)</td>
                   <td style="padding:4px 12px;font-size:13px;color:#6b6b67;text-align:right;">${formatAmount(d.taxAmount, d.currency)}</td>
@@ -288,6 +301,7 @@ function buildReceiptEmailHtml(d: InvoiceData, recipientEmail: string): string {
                   <td style="padding:4px 12px;font-size:13px;color:#6b6b67;">Subtotal</td>
                   <td style="padding:4px 12px;font-size:13px;color:#6b6b67;text-align:right;">${formatAmount(d.subtotal, d.currency)}</td>
                 </tr>
+                ${discountRow(d)}
                 <tr>
                   <td style="padding:4px 12px;font-size:13px;color:#6b6b67;">Tax (${d.taxRate}%)</td>
                   <td style="padding:4px 12px;font-size:13px;color:#6b6b67;text-align:right;">${formatAmount(d.taxAmount, d.currency)}</td>
@@ -544,6 +558,7 @@ function buildQuoteEmailHtml(d: InvoiceData, recipientEmail: string): string {
                   <td style="padding:4px 12px;font-size:13px;color:#6b6b67;">Subtotal</td>
                   <td style="padding:4px 12px;font-size:13px;color:#6b6b67;text-align:right;">${formatAmount(d.subtotal, d.currency)}</td>
                 </tr>
+                ${discountRow(d)}
                 <tr>
                   <td style="padding:4px 12px;font-size:13px;color:#6b6b67;">Tax (${d.taxRate}%)</td>
                   <td style="padding:4px 12px;font-size:13px;color:#6b6b67;text-align:right;">${formatAmount(d.taxAmount, d.currency)}</td>

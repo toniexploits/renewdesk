@@ -1,4 +1,4 @@
-import type { Currency } from '@/lib/types'
+import type { Currency, DiscountType } from '@/lib/types'
 
 const SYMBOLS: Record<string, string> = {
   NGN: '₦',
@@ -34,3 +34,15 @@ export const CURRENCY_OPTIONS: { value: Currency; label: string }[] = [
   { value: 'GHS', label: 'GHS — GH₵ Ghanaian Cedi' },
   { value: 'ZAR', label: 'ZAR — R South African Rand' },
 ]
+
+// Discount is applied to the subtotal before tax. Clamped so it never exceeds the subtotal.
+export function calcDiscount(subtotal: number, type: DiscountType, value: number): number {
+  if (!value || value <= 0 || subtotal <= 0) return 0
+  const raw = type === 'percent' ? (subtotal * Math.min(value, 100)) / 100 : value
+  return Math.min(raw, subtotal)
+}
+
+// Label for the discount row, e.g. "Discount (10%)" or "Discount"
+export function discountLabel(type: DiscountType | null | undefined, value: number | null | undefined): string {
+  return type === 'percent' && value ? `Discount (${value}%)` : 'Discount'
+}

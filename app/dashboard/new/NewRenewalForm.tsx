@@ -2,9 +2,9 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { formatAmount, CURRENCY_OPTIONS } from '@/lib/format'
+import { formatAmount, CURRENCY_OPTIONS, calcDiscount, discountLabel } from '@/lib/format'
 import { generatePDF, fetchLogoDataUrl } from '@/lib/generatePDF'
-import type { Profile, Invoice, LineItem, BankAccount, BankDetailsSnapshot } from '@/lib/types'
+import type { Profile, Invoice, LineItem, BankAccount, BankDetailsSnapshot, DiscountType } from '@/lib/types'
 import type { UsageResult } from '@/lib/usageLimits'
 import { useSubscription } from '@/hooks/useSubscription'
 import BankAccountSelector, {
@@ -194,6 +194,7 @@ interface PreviewProps {
   items: LineItem[]
   invNumber: string
   subtotal: number
+  discountAmount: number
   taxAmount: number
   grand: number
   status?: string
@@ -201,7 +202,7 @@ interface PreviewProps {
   bankSnapshot?: BankDetailsSnapshot | null
 }
 
-function InvoicePreview({ form, items, invNumber, subtotal, taxAmount, grand, status, paymentDate, bankSnapshot }: PreviewProps) {
+function InvoicePreview({ form, items, invNumber, subtotal, discountAmount, taxAmount, grand, status, paymentDate, bankSnapshot }: PreviewProps) {
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
   const isPaid = status === 'paid'
   const heading = isPaid ? 'Receipt' : 'Invoice'
@@ -304,6 +305,12 @@ function InvoicePreview({ form, items, invNumber, subtotal, taxAmount, grand, st
             <span>Subtotal</span>
             <span>{formatAmount(subtotal, currency)}</span>
           </div>
+          {discountAmount > 0 && (
+            <div className="flex justify-between text-xs text-gray-500 py-0.5">
+              <span>{discountLabel(form.discountType, form.discountValue)}</span>
+              <span>−{formatAmount(discountAmount, currency)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-xs text-gray-500 py-0.5">
             <span>Tax ({form.taxRate}%)</span>
             <span>{formatAmount(taxAmount, currency)}</span>
@@ -351,6 +358,8 @@ interface FormData {
   bizEmail: string
   currency: string
   taxRate: number
+  discountType: DiscountType
+  discountValue: number
 }
 
 // ─── Main component ──────────────────────────────────────────────────────────
@@ -398,7 +407,10 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts, usage, 
     bizEmail: profile?.business_email ?? '',
     currency: invoice?.currency ?? profile?.currency ?? 'NGN',
     taxRate: invoice?.tax_rate ?? profile?.tax_rate ?? 7.5,
+    discountType: invoice?.discount_type ?? 'percent',
+    discountValue: invoice?.discount_value ?? 0,
   })
+  const [showDiscount, setShowDiscount] = useState<boolean>((invoice?.discount_value ?? 0) > 0)
 
   // Bank account selection — default to invoice's saved account, else default account
   const initialAccountId =
@@ -449,8 +461,12 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts, usage, 
 
   // Computed totals
   const subtotal = useMemo(() => items.reduce((s, i) => s + i.qty * i.price, 0), [items])
-  const taxAmount = useMemo(() => (subtotal * form.taxRate) / 100, [subtotal, form.taxRate])
-  const grand = useMemo(() => subtotal + taxAmount, [subtotal, taxAmount])
+  const discountAmount = useMemo(
+    () => calcDiscount(subtotal, form.discountType, form.discountValue),
+    [subtotal, form.discountType, form.discountValue]
+  )
+  const taxAmount = useMemo(() => ((subtotal - discountAmount) * form.taxRate) / 100, [subtotal, discountAmount, form.taxRate])
+  const grand = useMemo(() => subtotal - discountAmount + taxAmount, [subtotal, discountAmount, taxAmount])
 
   // Build the PDF data object for reuse across handlers
   function getPDFData() {
@@ -469,6 +485,8 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts, usage, 
       taxRate: form.taxRate,
       items: items.map((i) => ({ desc: i.desc, qty: i.qty, price: i.price })),
       subtotal,
+      discountAmount,
+      discountLabel: discountLabel(form.discountType, form.discountValue),
       taxAmount,
       grand,
       bankName: snap?.bank_name || undefined,
@@ -528,6 +546,9 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts, usage, 
         renewal_date: form.renewalDate || null,
         line_items: items,
         subtotal,
+        discount_type: form.discountType,
+        discount_value: discountAmount > 0 ? form.discountValue : 0,
+        discount_amount: discountAmount,
         tax_rate: form.taxRate,
         tax_amount: taxAmount,
         total: grand,
@@ -596,7 +617,10 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts, usage, 
       bizEmail: profile?.business_email ?? '',
       currency: profile?.currency ?? 'NGN',
       taxRate: profile?.tax_rate ?? 7.5,
+      discountType: 'percent',
+      discountValue: 0,
     })
+    setShowDiscount(false)
     setSelectedBankId(bankAccounts.find((a) => a.is_default)?.id ?? bankAccounts[0]?.id ?? null)
     setUseCustomBank(false)
     setCustomBank(EMPTY_CUSTOM)
@@ -716,6 +740,8 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts, usage, 
             taxRate: form.taxRate,
             items: items.map((i) => ({ desc: i.desc, qty: i.qty, price: i.price })),
             subtotal,
+            discountAmount,
+            discountLabel: discountLabel(form.discountType, form.discountValue),
             taxAmount,
             grand,
             bankName: snap?.bank_name ?? '',
@@ -1009,6 +1035,46 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts, usage, 
 
             <div className="flex flex-col gap-1 pt-3" style={{ borderTop: '1px solid rgba(0,0,0,0.08)' }}>
               <div className="flex justify-between text-sm text-gray-500 py-0.5"><span>Subtotal</span><span>{formatAmount(subtotal, form.currency)}</span></div>
+              {showDiscount ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-500 py-1">
+                  <div className="flex items-center gap-2">
+                    <span>Discount</span>
+                    <div className="flex rounded-lg overflow-hidden border border-black/10 text-xs">
+                      {(['percent', 'fixed'] as const).map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setField('discountType', t)}
+                          className={`px-2.5 py-1 transition-colors ${form.discountType === t ? 'bg-brand text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                        >
+                          {t === 'percent' ? '%' : form.currency}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      className="w-20 bg-surface rounded-md border border-black/10 px-2 py-1 text-sm text-gray-800 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                      type="number"
+                      min={0}
+                      max={form.discountType === 'percent' ? 100 : undefined}
+                      step={form.discountType === 'percent' ? 0.5 : 0.01}
+                      value={form.discountValue}
+                      onChange={(e) => setField('discountValue', Math.max(0, Number(e.target.value)))}
+                      aria-label="Discount value"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { setShowDiscount(false); setField('discountValue', 0) }}
+                      className="text-gray-300 hover:text-red-500 transition-colors text-lg leading-none px-1"
+                      aria-label="Remove discount"
+                    >×</button>
+                  </div>
+                  <span>−{formatAmount(discountAmount, form.currency)}</span>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setShowDiscount(true)} className="self-start text-sm text-brand hover:text-brand-dark font-medium py-0.5">
+                  + Add discount
+                </button>
+              )}
               <div className="flex justify-between text-sm text-gray-500 py-0.5"><span>Tax ({form.taxRate}%)</span><span>{formatAmount(taxAmount, form.currency)}</span></div>
               <div className="flex justify-between text-base font-semibold text-gray-900 py-2.5 mt-1" style={{ borderTop: '1.5px solid rgba(0,0,0,0.13)' }}>
                 <span>Total due</span>
@@ -1041,6 +1107,7 @@ export default function NewRenewalForm({ profile, invoice, bankAccounts, usage, 
             items={items}
             invNumber={invNumber}
             subtotal={subtotal}
+            discountAmount={discountAmount}
             taxAmount={taxAmount}
             grand={grand}
             status={invoice?.status}

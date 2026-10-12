@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf'
 import type { Invoice, Profile } from './types'
+import { discountLabel } from './format'
 
 // ─── PDF-safe currency formatting ────────────────────────────────────────────
 // jsPDF's built-in Helvetica cannot render Unicode symbols like ₦, £, €, etc.
@@ -111,6 +112,10 @@ export interface InvoicePDFData {
   taxRate: number
   items: Array<{ desc: string; qty: number; price: number }>
   subtotal: number
+  /** Amount deducted before tax. Row is hidden when 0 or omitted. */
+  discountAmount?: number
+  /** e.g. "Discount (10%)". Defaults to "Discount". */
+  discountLabel?: string
   taxAmount: number
   grand: number
   bankName?: string
@@ -343,6 +348,11 @@ export function generatePDF(data: InvoicePDFData): jsPDF {
   doc.text('Subtotal', totalsLabelX, y)
   doc.text(pdfAmount(data.subtotal, data.currency), colAmt, y, { align: 'right' })
   y += 6
+  if (data.discountAmount && data.discountAmount > 0) {
+    doc.text(data.discountLabel ?? 'Discount', totalsLabelX, y)
+    doc.text(`-${pdfAmount(data.discountAmount, data.currency)}`, colAmt, y, { align: 'right' })
+    y += 6
+  }
   doc.text(`Tax (${data.taxRate}%)`, totalsLabelX, y)
   doc.text(pdfAmount(data.taxAmount, data.currency), colAmt, y, { align: 'right' })
   y += 4
@@ -539,6 +549,8 @@ export function invoiceToPDFData(
         }))
       : [],
     subtotal: invoice.subtotal,
+    discountAmount: invoice.discount_amount ?? 0,
+    discountLabel: discountLabel(invoice.discount_type, invoice.discount_value),
     taxAmount: invoice.tax_amount,
     grand: invoice.total,
     bankName,

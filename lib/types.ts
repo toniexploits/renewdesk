@@ -52,6 +52,7 @@ export interface BankDetailsSnapshot {
 }
 
 export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled' | 'draft' | 'partial'
+export type DiscountType = 'percent' | 'fixed'
 
 export interface TeamMember {
   id: string
@@ -102,6 +103,9 @@ export interface Invoice {
   renewal_date: string | null
   line_items: LineItem[]
   subtotal: number
+  discount_type: DiscountType
+  discount_value: number
+  discount_amount: number
   tax_rate: number
   tax_amount: number
   total: number

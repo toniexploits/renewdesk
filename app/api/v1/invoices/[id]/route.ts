@@ -5,6 +5,8 @@ import {
   handleOptions, logRequest, withRateLimitHeaders,
 } from '@/lib/apiMiddleware'
 import { triggerWebhook } from '@/lib/webhooks'
+import { calcDiscount } from '@/lib/format'
+import type { DiscountType } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,11 +65,14 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }))
     updates.line_items = items
     const subtotal  = items.reduce((s, i) => s + i.qty * i.price, 0)
-    const taxRate   = (existing as Record<string,number>).tax_rate ?? 7.5
-    const taxAmount = (subtotal * taxRate) / 100
-    updates.subtotal   = subtotal
-    updates.tax_amount = taxAmount
-    updates.total      = subtotal + taxAmount
+    const ex        = existing as Record<string, unknown>
+    const taxRate   = (ex.tax_rate as number) ?? 7.5
+    const discount  = calcDiscount(subtotal, (ex.discount_type as DiscountType) ?? 'percent', Number(ex.discount_value ?? 0))
+    const taxAmount = ((subtotal - discount) * taxRate) / 100
+    updates.subtotal        = subtotal
+    updates.discount_amount = discount
+    updates.tax_amount      = taxAmount
+    updates.total           = subtotal - discount + taxAmount
   }
 
   const { data: updated, error: dbErr } = await admin.from('invoices')
